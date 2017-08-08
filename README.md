@@ -22,3 +22,7 @@ All settings and functions are available from the shootyepgp icon on minimap or 
 The basic member functionality can be used even by members without the addon. 
 - bidding by `/w masterlooter +` (for main spec) or `/w masterlooter -` (for off spec) after the loot officer links a piece of loot and asks for bids in raid chat.
 - joining the guild reserves chat channel and responding with `/x +` (where x is the number of the custom channel) or `/x +MainName` if on an alt.
+
+## download
+- Release version: Download shootyepgp-x.y-11200.zip file from [latest](https://github.com/Road-block/shootyepgp/releases/latest) and extract to AddOns folder.
+- *Alpha version: Download shootyepgp-master.zip from [here](https://github.com/Road-block/shootyepgp/archive/master.zip) extract to AddOns folder and **remove** the -master suffix from the folder so it's just `shootyepgp`.*
