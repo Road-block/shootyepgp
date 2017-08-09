@@ -84,13 +84,13 @@ end
 
 function sepgp_bids:announceWinnerMS(name, pr)
   if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Highest MainSpec Bid is %s with %dPR",name,pr),"RAID")
+    SendChatMessage(string.format("Highest MainSpec Bid is %s with %.03fPR",name,pr),"RAID")
   end
 end
 
 function sepgp_bids:announceWinnerOS(name, pr)
   if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Highest OffSpec Bid is %s with %dPR",name,pr),"RAID")
+    SendChatMessage(string.format("Highest OffSpec Bid is %s with %.03fPR",name,pr),"RAID")
   end
 end
 

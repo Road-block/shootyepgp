@@ -2,7 +2,7 @@
 ## Title: shootyepgp
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: shooty, Roadblock
-## Version: 2.0
+## Version: 2.1
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
 ## SavedVariablesPerCharacter: 
@@ -19,6 +19,7 @@ Libs\AceDebug-2.0\AceDebug-2.0.lua
 Libs\AceLocale-2.2\AceLocale-2.2.lua
 
 Libs\Babble-Class-2.2\Babble-Class-2.2.lua
+Libs\Babble-Zone-2.2\Babble-Zone-2.2.lua
 Libs\Crayon-2.0\Crayon-2.0.lua
 Libs\Compost-2.0\Compost-2.0.lua
 Libs\Dewdrop-2.0\Dewdrop-2.0.lua

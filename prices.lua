@@ -596,7 +596,6 @@ local prices = {
     -------------------
     --- Molten Core ---
     -------------------
-  [13982] = {4,"T1"}; -- [DEBUG]Warblade of Caer Darrow
   [17109] = {8,"T1"}; --Choker of Enlightenment
   [17077] = {4,"T1"}; --Crimson Shocker
   [18861] = {4,"T1"}; --Flamewalker Legplates

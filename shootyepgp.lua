@@ -1,9 +1,11 @@
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
 sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
+local BZ = AceLibrary("Babble-Zone-2.2")
 
 local playerName = (UnitName("player"))
 local shooty_basegp = 135
+local shooty_baseaward_ep = 100
 local shooty_decay = 0.85
 local shooty_max = 10000
 local shooty_timeout = 45
@@ -110,7 +112,7 @@ function sepgp:TipHook()
   self:SecureHook(GameTooltip, "SetBagItem", function(this, bag, slot)
     sepgp:AddDataToTooltip(GameTooltip, GetContainerItemLink(bag, slot))
   end
-  )  -- DEBUG - remove for final
+  )  -- we leave it in for now so they can check if they were billed the correct GP
   self:SecureHook(GameTooltip, "SetLootItem", function(this, slot)
     sepgp:AddDataToTooltip(GameTooltip, GetLootSlotLink(slot))
   end
@@ -433,10 +435,11 @@ function sepgp:buildClassMemberTable(roster,epgp)
       c[class].args[name].name = name
       c[class].args[name].desc = string.format(desc,name)
       c[class].args[name].usage = usage
-      c[class].args[name].get = false
       if epgp == "ep" then
+        c[class].args[name].get = "suggestedAwardEP"
         c[class].args[name].set = function(v) sepgp:givename_ep(name, tonumber(v)) end
       elseif epgp == "gp" then
+        c[class].args[name].get = false
         c[class].args[name].set = function(v) sepgp:givename_gp(name, tonumber(v)) end
       end
       c[class].args[name].validate = function(v) return (type(v) == "number" or tonumber(v)) and tonumber(v) < shooty_max end
@@ -451,6 +454,7 @@ function sepgp:buildMenu()
     options = {
     type = "group",
     desc = "shootyepgp options",
+    handler = self,
     args = { }
     }
     options.args["ep"] = {
@@ -465,7 +469,7 @@ function sepgp:buildMenu()
       name = "+EPs to Raid",
       desc = "Award EPs to all raid members.",
       order = 20,
-      get = false,
+      get = "suggestedAwardEP",
       set = function(v) sepgp:award_raid_ep(tonumber(v)) end,
       usage = "<EP>",
       hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
@@ -486,8 +490,8 @@ function sepgp:buildMenu()
       name = "+EPs to Reserves",
       desc = "Award EPs to all active Reserves.",
       order = 40,
-      get = false,
-      set = function(v) sepgp:award_reserve_ep(tonumber(v))end,
+      get = "suggestedAwardEP",
+      set = function(v) sepgp:award_reserve_ep(tonumber(v)) end,
       usage = "<EP>",
       hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
       validate = function(v)
@@ -498,7 +502,7 @@ function sepgp:buildMenu()
     options.args["reserves"] = {
       type = "toggle",
       name = "Enable Reserves",
-      desc = "Participate in Reserves Functionality.\n|cffff0000Needs Main Set in Options.|r",
+      desc = "Participate in Standby Raiders List.\n|cffff0000Requires Main Character Name.|r",
       order = 50,
       get = function() return (sepgp.reservesChannelID ~= nil) and (sepgp.reservesChannelID ~= 0) end,
       set = function(v) sepgp:reservesToggle(v) end,
@@ -571,7 +575,7 @@ function sepgp:buildMenu()
       step = 0.01,
       bigStep = 0.05,
       isPercent = true,
-      hidden = function() return not (IsGuildLeader()) end,    
+      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,    
     }
     options.args["set_discount"] = {
       type = "range",
@@ -676,15 +680,19 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
   if not (channel) or not (channel == sepgp_reservechannel) then return end
   local reserve, reserve_class, reserve_rank, reserve_alt = nil,nil,nil,nil
   local r,_,rdy,name = string.find(text,shooty_reserveanswer)
-  if (r) and (running_check) then -- need to check that the same person is not declaring multiple mains (cheaters)
+  if (r) and (running_check) then
     if (rdy) then
       if (name) and (name ~= "") then
-        reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(name)
-        if reserve ~= sender then
-          reserve_alt = sender
+        if (not sepgp:inRaid(name)) then
+          reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(name)
+          if reserve ~= sender then
+            reserve_alt = sender
+          end
         end
       else
-        reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(sender)    
+        if (not sepgp:inRaid(sender)) then
+          reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(sender)    
+        end
       end
       if reserve and reserve_class and reserve_rank then
         if reserve_alt then
@@ -852,6 +860,41 @@ function sepgp:lootMaster()
     return true
   else
     return false
+  end
+end
+
+local raidZones = {["Molten Core"]="T1",["Onyxia\'s Lair"]="T1.5",["Blackwing Lair"]="T2",["Ahn'Qiraj"]="T2.5",["Naxxramas"]="T3"}
+local zone_multipliers = {
+  ["T3"] = {["T3"]=1,["T2.5"]=0.75,["T2"]=0.5,["T1.5"]=0.25,["T1"]=0.25},
+  ["T2.5"] = {["T3"]=1,["T2.5"]=1,["T2"]=0.7,["T1.5"]=0.4,["T1"]=0.4},
+  ["T2"] = {["T3"]=1,["T2.5"]=1,["T2"]=1,["T1.5"]=0.5,["T1"]=0.5},
+  ["T1"] = {["T3"]=1,["T2.5"]=1,["T2"]=1,["T1.5"]=1,["T1"]=1}
+}
+function sepgp:suggestedAwardEP()
+  local currentTier, zoneEN, zoneLoc, checkTier, multiplier
+  local inInstance, instanceType = IsInInstance()
+  if (inInstance == nil) or (instanceType ~= nil and instanceType == "none") then
+    currentTier = "T1.5"   
+  end
+  if (inInstance) and (instanceType == "raid") then
+    zoneLoc = GetRealZoneText()
+    if (BZ:HasReverseTranslation(zoneLoc)) then
+      zoneEN = BZ:GetReverseTranslation(zoneLoc)
+      checkTier = raidZones[zoneEN]
+      if (checkTier) then
+        currentTier = checkTier
+      end
+    end
+  end
+  if not currentTier then 
+    return shooty_baseaward_ep
+  else
+    multiplier = zone_multipliers[sepgp_progress][currentTier]
+  end
+  if (multiplier) then
+    return multiplier*shooty_baseaward_ep
+  else
+    return shooty_baseaward_ep
   end
 end
 
