@@ -617,6 +617,9 @@ function sepgp:reservesToggle(flag)
   if (flag) then -- we want in
     if (reservesChannelID) and reservesChannelID ~= 0 then
       sepgp.reservesChannelID = reservesChannelID
+      if not self:IsEventRegistered("CHAT_MSG_CHANNEL") then
+        sepgp:RegisterEvent("CHAT_MSG_CHANNEL","captureReserveChatter")
+      end
       return true
     else
       sepgp:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE","reservesChannelChange")
@@ -629,6 +632,9 @@ function sepgp:reservesToggle(flag)
       LeaveChannelByName(sepgp_reservechannel)
       return
     else
+      if sepgp:IsEventRegistered("CHAT_MSG_CHANNEL") then
+        sepgp:UnregisterEvent("CHAT_MSG_CHANNEL")
+      end      
       return false
     end
   end
@@ -700,14 +706,14 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
             reserves_blacklist[reserve_alt] = true
             table.insert(sepgp.reserves,{reserve,reserve_class,reserve_rank,reserve_alt})
           else
-            sepgp:defaultPrint(string.format("|cffff0000%s|r has already added a member to Reserves. Discarding!"))
+            sepgp:defaultPrint(string.format("|cffff0000%s|r trying to add %s to Reserves, but has already added a member. Discarding!",reserve_alt,reserve))
           end
         else
           if not reserves_blacklist[reserve] then
             reserves_blacklist[reserve] = true
             table.insert(sepgp.reserves,{reserve,reserve_class,reserve_rank})
           else
-            sepgp:defaultPrint(string.format("|cffff0000%s|r has already added a member to Reserves. Discarding!"))
+            sepgp:defaultPrint(string.format("|cffff0000%s|r has already been added to Reserves. Discarding!",reserve))
           end
         end
       end

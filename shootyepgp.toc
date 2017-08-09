@@ -2,7 +2,7 @@
 ## Title: shootyepgp
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: shooty, Roadblock
-## Version: 2.1
+## Version: 2.11
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
 ## SavedVariablesPerCharacter: 
