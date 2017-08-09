@@ -6,6 +6,8 @@ shootyepgp requires some modifications to guild permissions related to public an
 - public and officer notes must be set to visible by all.
 - public and officer notes **must** be editable **only** by the EPGP admins (officer rank and higher as an example)
 
+Creating a new chatframe (right-click > create new window on chat tab) and naming it `debug` (capitalization doesn't matter) will move the more spammy information messages from the addon there and out of your default chatframe.
+
 ## usage
 All settings and functions are available from the shootyepgp icon on minimap or FuBar
 
