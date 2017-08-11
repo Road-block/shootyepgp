@@ -781,7 +781,7 @@ function sepgp:captureLootCall(text, sender)
   if not (IsRaidLeader() or self:lootMaster()) then return end
   if not sender == playerName then return end
   if not (string.find(text, "|Hitem:", 1, true)) then return end
-  local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s'%-]+%]|h|r"," ; ")
+  local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r"," ; ")
   if count > 1 then return end
   local lowtext = string.lower(linkstriptext)
   local whisperkw_found, mskw_found, oskw_found, link_found
@@ -799,7 +799,7 @@ function sepgp:captureLootCall(text, sender)
     if (oskw_found) then break end
   end
   if (whisperkw_found) or (mskw_found) or (oskw_found) then
-    _,_,itemLink = string.find(text,"(|c%x+|H[eimt:%d]+|h%[[%w%s'%-]+%]|h|r)")
+    _,_,itemLink = string.find(text,"(|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r)")
     if (itemLink) and (itemLink ~= "") then
       link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
     end
