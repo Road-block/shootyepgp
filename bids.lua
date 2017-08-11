@@ -40,12 +40,30 @@ function sepgp_bids:Refresh()
   T:Refresh("sepgp_bids")
 end
 
+function sepgp_bids:setHideScript()
+  local detachedFrame, tablet
+  for i=1,4 do
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",1))
+    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_bids" then
+      if not (tablet:GetScript("OnHide")) then
+        tablet:SetScript("OnHide",function()
+            if not T:IsAttached("sepgp_bids") then
+              T:Attach("sepgp_bids")
+              this:SetScript("OnHide",nil)
+            end
+          end)
+      end
+    end
+  end
+end
+
 function sepgp_bids:Toggle(forceShow)
   if T:IsAttached("sepgp_bids") then
     T:Detach("sepgp_bids")
     if (T:IsLocked("sepgp_bids")) then
       T:ToggleLocked("sepgp_bids")
     end
+    self:setHideScript()
     --[[if not (sepgp:IsEventScheduled("shootyepgpBidRefresh")) then
       sepgp:ScheduleRepeatingEvent("shootyepgpBidRefresh", self.Refresh, 5, self)
     end]]

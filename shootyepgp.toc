@@ -1,11 +1,12 @@
 ## Interface: 11200
 ## Title: shootyepgp
 ## Notes: Effort Points/Gear Points Loot System
-## Author: shooty, Roadblock
-## Version: 2.11
+## Author: Roadblock
+## X-Credits: shooty for original version
+## Version: 2.2
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
-## SavedVariablesPerCharacter: 
+## SavedVariablesPerCharacter: sepgp_log
 
 Libs\AceLibrary\AceLibrary.lua
 Libs\AceOO-2.0\AceOO-2.0.lua
@@ -31,3 +32,4 @@ standings.lua
 reserves.lua
 bids.lua
 prices.lua
+logs.lua

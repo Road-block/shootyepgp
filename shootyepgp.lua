@@ -7,14 +7,16 @@ local playerName = (UnitName("player"))
 local shooty_basegp = 135
 local shooty_baseaward_ep = 100
 local shooty_decay = 0.85
-local shooty_max = 10000
+local shooty_max = 5000
 local shooty_timeout = 45
+local shooty_maxloglines = 300
 local shooty_reservechan = "Reserves"
 local shooty_reservecall = string.format("{shootyepgp}Type \"+\" in this channel if on main, or \"+<MainName>\" if on alt within %dsec.",shooty_timeout)
 local shooty_reserveanswer = "^(%+)(%a*)$"
 local out = "|cff9664c8shootyepgp:|r %s"
 local lastUpdate = 0
 local needInit = true
+local admin
 local shooty_debugchat
 local running_check,running_bid
 local partyUnit,raidUnit = {},{}
@@ -41,6 +43,7 @@ function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_decay == nil then sepgp_decay = shooty_decay end
   if sepgp_progress == nil then sepgp_progress = "T1" end
   if sepgp_discount == nil then sepgp_discount = 0.25 end
+  if sepgp_log == nil then sepgp_log = {} end
   sepgp.extratip = CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
 end
 
@@ -71,6 +74,11 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   end
   -- hook tooltip to add our GP values
   sepgp:TipHook()
+
+  -- make tablets closable with ESC
+  for i=1,4 do
+    table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
+  end
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
@@ -300,6 +308,7 @@ end
 function sepgp:award_raid_ep(ep) -- awards ep to raid members in zone
   if GetNumRaidMembers()>0 then
     sepgp:simpleSay(string.format("Giving %d ep to all raidmembers",ep))
+    self:addToLog(string.format("Giving %d ep to all raidmembers",ep))
     for i = 1, GetNumRaidMembers(true) do
       local name, rank, subgroup, level, class, fileName, zone, online, isDead = GetRaidRosterInfo(i)
       sepgp:givename_ep(name,ep)
@@ -310,6 +319,7 @@ end
 function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
   if table.getn(sepgp.shooty_reserves) > 0 then
     sepgp:simpleSay(string.format("Giving %d ep to active reserves",ep))
+    self:addToLog(string.format("Giving %d ep to active reserves",ep))
     for i, name in ipairs(sepgp.shooty_reserves) do
       sepgp:givename_ep(name,ep)
     end
@@ -319,20 +329,24 @@ function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
 end
 
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
+  if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d ep to %s",ep,getname))
   ep = ep + sepgp:get_ep(getname)
   sepgp:update_ep(getname,ep)
 end
 
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
+  if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d gp to %s",gp,getname))
   local oldgp = sepgp:get_gp(getname)
   local newgp = gp + oldgp
   sepgp:adminSay(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
+  self:addToLog(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
   sepgp:update_gp(getname,newgp)
 end
 
 function sepgp:decay_epgp() -- decays entire roster's ep and gp
+  if not (admin()) then return end
   for i = 1, GetNumGuildMembers(1) do
     local name,_,_,_,class,_,ep,gp,_,_ = GetGuildRosterInfo(i)
     ep = tonumber(ep)
@@ -345,15 +359,21 @@ function sepgp:decay_epgp() -- decays entire roster's ep and gp
   	  GuildRosterSetOfficerNote(i,gp)
     end
   end
-  local msg = string.format("all ep and gp decayed by %d%%",(1-sepgp_decay)*100)
+  local msg = string.format("All EP and GP decayed by %d%%",(1-sepgp_decay)*100)
   sepgp:simpleSay(msg)
+  if not (sepgp_saychannel=="OFFICER") then sepgp:adminSay(msg) end
+  self:addToLog(msg)
 end
 
 function sepgp:gp_reset()
-   for i = 1, GetNumGuildMembers(1) do
-     GuildRosterSetOfficerNote(i, shooty_basegp)
-   end
-   sepgp:debugPrint(string.format("All GP has been reset to %d.",shooty_basegp))
+  if (IsGuildLeader()) then
+    for i = 1, GetNumGuildMembers(1) do
+      GuildRosterSetOfficerNote(i, shooty_basegp)
+    end
+    sepgp:debugPrint(string.format("All GP has been reset to %d.",shooty_basegp))
+    self:adminSay(string.format("All GP has been reset to %d.",shooty_basegp))
+    self:addToLog(string.format("All GP has been reset to %d.",shooty_basegp))
+  end
 end
 
 ---------
@@ -367,14 +387,23 @@ sepgp.tooltipHidderWhenEmpty = false
 sepgp.hasIcon = "Interface\\Icons\\INV_Misc_Orb_04"
 
 function sepgp:OnTooltipUpdate()
-  T:SetHint("|cffffff00Click|r to toggle Standings. \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Right-Click|r for Options.")
+  local hint = "|cffffff00Click|r to toggle Standings.%s \n|cffffff00Right-Click|r for Options."
+  if (admin()) then
+    hint = string.format(hint," \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Shift+Click|r to toggle Logs.")
+  else
+    hint = string.format(hint,"")
+  end
+  T:SetHint(hint)
 end
 
 function sepgp:OnClick()
-  if (IsControlKeyDown()) then
+  local is_admin = admin()
+  if (IsControlKeyDown() and is_admin) then
     sepgp_reserves:Toggle()
-  elseif (IsAltKeyDown()) then
+  elseif (IsAltKeyDown() and is_admin) then
     sepgp_bids:Toggle()
+  elseif (IsShiftKeyDown() and is_admin) then
+    sepgp_logs:Toggle()
   else
     sepgp_standings:Toggle()
   end
@@ -426,7 +455,7 @@ function sepgp:buildClassMemberTable(roster,epgp)
       c[class].type = "group"
       c[class].name = class
       c[class].desc = class .. " members"
-      c[class].hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end
+      c[class].hidden = function() return not (admin()) end
       c[class].args = { }
     end
     if c[class].args[name] == nil then
@@ -462,7 +491,7 @@ function sepgp:buildMenu()
       name = "+EPs to Member",
       desc = "Account EPs for member.",
       order = 10,
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
     }
     options.args["ep_raid"] = {
       type = "text",
@@ -472,7 +501,7 @@ function sepgp:buildMenu()
       get = "suggestedAwardEP",
       set = function(v) sepgp:award_raid_ep(tonumber(v)) end,
       usage = "<EP>",
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
       validate = function(v)
         local n = tonumber(v)
         return n and n >= 0 and n < shooty_max
@@ -483,7 +512,7 @@ function sepgp:buildMenu()
       name = "+GPs to Member",
       desc = "Account GPs for member.",
       order = 30,
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
     }
     options.args["ep_reserves"] = {
       type = "text",
@@ -493,7 +522,7 @@ function sepgp:buildMenu()
       get = "suggestedAwardEP",
       set = function(v) sepgp:award_reserve_ep(tonumber(v)) end,
       usage = "<EP>",
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
       validate = function(v)
         local n = tonumber(v)
         return n and n >= 0 and n < shooty_max
@@ -513,7 +542,7 @@ function sepgp:buildMenu()
       name = "AFK Check Reserves",
       desc = "AFK Check Reserves List",
       order = 60,
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
       func = function() sepgp:afkcheck_reserves() end
     }
     options.args["set_main"] = {
@@ -536,30 +565,31 @@ function sepgp:buildMenu()
         sepgp:SetRefresh(true)
       end,
     }
-    options.args["report_channel"] = {
-      type = "text",
-      name = "Reporting channel",
-      desc = "Channel used by reporting functions.",
-      order = 90,
-      get = function() return sepgp_saychannel end,
-      set = function(v) sepgp_saychannel = v end,
-      validate = { "PARTY", "RAID", "GUILD", "OFFICER" },
-    }
     options.args["progress_tier"] = {
       type = "text",
       name = "Raid Progress",
       desc = "Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.",
-      order = 95,
+      order = 90,
       get = function() return sepgp_progress end,
       set = function(v) sepgp_progress = v sepgp_bids:Refresh() end,
       validate = { ["T3"]="4.Naxxramas", ["T2.5"]="3.Temple of Ahn\'Qiraj", ["T2"]="2.Blackwing Lair", ["T1"]="1.Molten Core"},
     }
+    options.args["report_channel"] = {
+      type = "text",
+      name = "Reporting channel",
+      desc = "Channel used by reporting functions.",
+      order = 95,
+      hidden = function() return not (admin()) end,
+      get = function() return sepgp_saychannel end,
+      set = function(v) sepgp_saychannel = v end,
+      validate = { "PARTY", "RAID", "GUILD", "OFFICER" },
+    }    
     options.args["decay"] = {
       type = "execute",
       name = "Decay EPGP",
       desc = string.format("Decays all EPGP by %d%%",(1-(sepgp_decay or shooty_decay))*100),
       order = 100,
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,
+      hidden = function() return not (admin()) end,
       func = function() sepgp:decay_epgp() end
     }    
     options.args["set_decay"] = {
@@ -575,7 +605,7 @@ function sepgp:buildMenu()
       step = 0.01,
       bigStep = 0.05,
       isPercent = true,
-      hidden = function() return not (CanEditOfficerNote() and CanEditPublicNote()) end,    
+      hidden = function() return not (admin()) end,    
     }
     options.args["set_discount"] = {
       type = "range",
@@ -595,7 +625,7 @@ function sepgp:buildMenu()
      desc = string.format("gives everybody %d basic GP (Admin only).",shooty_basegp),
      order = 120,
      hidden = function() return not (IsGuildLeader()) end,
-     func = function() sepgp:gp_reset() end
+     func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET_GP") end
     }
   end
   if (needInit) or (needRefresh) then
@@ -737,13 +767,23 @@ lootCall.whisp = {
   "^(whisper)[%s%p%c]+.+",".+[%s%p%c]+(whisper)$",".+[%s%p%c]+(whisper)[%s%p%c]+.*",".*[%s%p%c]+(whisper)[%s%p%c]+.+",
   ".+[%s%p%c]+(bid)[%s%p%c]*.*",".*[%s%p%c]*(bid)[%s%p%c]+.+"
 }
-lootCall.ms = {".+(%+).*",".*(%+).+", ".+(ms).*",".*(ms).+", ".+(mainspec).*",".*(mainspec).+"}
-lootCall.os = {".+(%-).*",".*(%-).+", ".+(os).*",".*(os).+", ".+(offspec).*",".*(offspec).+"}
+lootCall.ms = {
+  ".+(%+).*",".*(%+).+", 
+  "^(ms)[%s%p%c]+.+",".+[%s%p%c]+(ms)$",".+[%s%p%c]+(ms)[%s%p%c]+.*",".*[%s%p%c]+(ms)[%s%p%c]+.+", 
+  ".+(mainspec).*",".*(mainspec).+"
+}
+lootCall.os = {
+  ".+(%-).*",".*(%-).+", 
+  "^(os)[%s%p%c]+.+",".+[%s%p%c]+(os)$",".+[%s%p%c]+(os)[%s%p%c]+.*",".*[%s%p%c]+(os)[%s%p%c]+.+", 
+  ".+(offspec).*",".*(offspec).+"
+}
 function sepgp:captureLootCall(text, sender)
   if not (IsRaidLeader() or self:lootMaster()) then return end
   if not sender == playerName then return end
   if not (string.find(text, "|Hitem:", 1, true)) then return end
-  local lowtext = string.lower(text)
+  local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s'%-]+%]|h|r"," ; ")
+  if count > 1 then return end
+  local lowtext = string.lower(linkstriptext)
   local whisperkw_found, mskw_found, oskw_found, link_found
   local _, itemLink, itemColor, itemString, itemName
   for _,f in ipairs(lootCall.whisp) do
@@ -759,7 +799,7 @@ function sepgp:captureLootCall(text, sender)
     if (oskw_found) then break end
   end
   if (whisperkw_found) or (mskw_found) or (oskw_found) then
-    _,_,itemLink = string.find(text,"(|c%x+|H.+|h%[.+%]|h|r)")
+    _,_,itemLink = string.find(text,"(|c%x+|H[eimt:%d]+|h%[[%w%s'%-]+%]|h|r)")
     if (itemLink) and (itemLink ~= "") then
       link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
     end
@@ -829,6 +869,26 @@ function sepgp:clearBids()
   end
   running_bid = false
   sepgp_bids:Refresh()
+end
+
+------------
+-- Logging
+------------
+
+function sepgp:addToLog(line,skipTime)
+  local over = table.getn(sepgp_log)-shooty_maxloglines+1
+  if over > 0 then
+    for i=1,over do
+      table.remove(sepgp_log,1)
+    end
+  end
+  local timestamp
+  if (skipTime) then
+    timestamp = ""
+  else
+    timestamp = date("%b/%d %H:%M:%S")
+  end
+  table.insert(sepgp_log,{timestamp,line})
 end
 
 ------------
@@ -904,6 +964,10 @@ function sepgp:suggestedAwardEP()
   end
 end
 
+admin = function()
+  return (CanEditOfficerNote() and CanEditPublicNote())
+end
+
 -------------
 -- Dialogs
 -------------
@@ -953,3 +1017,16 @@ StaticPopupDialogs["SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE"] = {
   whileDead = 1,
   hideOnEscape = 1  
 }
+StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET_GP"] = {
+  text = "Are you sure you want to Reset ALL GP?",
+  button1 = "|cffff0000"..TEXT(OKAY).."|r",
+  button2 = TEXT(CANCEL),
+  OnAccept = function()
+    sepgp:gp_reset()
+  end,
+  timeout = 0,
+  whileDead = 1,
+  exclusive = 1,
+  showAlert = 1,
+  hideOnEscape = 1
+};

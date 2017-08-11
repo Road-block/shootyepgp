@@ -38,12 +38,30 @@ function sepgp_reserves:Refresh()
   T:Refresh("sepgp_reserves")
 end
 
+function sepgp_reserves:setHideScript()
+  local detachedFrame, tablet
+  for i=1,4 do
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",1))
+    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_reserves" then
+      if not (tablet:GetScript("OnHide")) then
+        tablet:SetScript("OnHide",function()
+            if not T:IsAttached("sepgp_reserves") then
+              T:Attach("sepgp_reserves")
+              this:SetScript("OnHide",nil)
+            end
+          end)
+      end
+    end
+  end
+end
+
 function sepgp_reserves:Toggle(forceShow)
   if T:IsAttached("sepgp_reserves") then
     T:Detach("sepgp_reserves")
     if (T:IsLocked("sepgp_reserves")) then
       T:ToggleLocked("sepgp_reserves")
     end
+    self:setHideScript()
   elseif (forceShow) then
   else
     T:Attach("sepgp_reserves")

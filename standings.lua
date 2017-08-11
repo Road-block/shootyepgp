@@ -12,18 +12,22 @@ shooty_export:SetPoint('TOP', UIParent, 'TOP', 0,-80)
 shooty_export:SetFrameStrata('DIALOG')
 shooty_export:Hide()
 shooty_export:SetBackdrop({
-  bgFile = [[Interface\Buttons\WHITE8x8]],
-  insets = {left = 3, right = 3, top = 4, bottom = 3
-}})
-shooty_export:SetBackdropColor(0, 0, 0, 0.7)
+  bgFile = [[Interface\Tooltips\UI-Tooltip-Background]],
+  edgeFile = [[Interface\Tooltips\UI-Tooltip-Border]],
+  tile = true,
+  tileSize = 16,
+  edgeSize = 16,
+  insets = {left = 5, right = 5, top = 5, bottom = 5}
+  })
+shooty_export:SetBackdropBorderColor(TOOLTIP_DEFAULT_COLOR.r, TOOLTIP_DEFAULT_COLOR.g, TOOLTIP_DEFAULT_COLOR.b)
+shooty_export:SetBackdropColor(TOOLTIP_DEFAULT_BACKGROUND_COLOR.r, TOOLTIP_DEFAULT_BACKGROUND_COLOR.g, TOOLTIP_DEFAULT_BACKGROUND_COLOR.b)
 shooty_export.title = shooty_export:CreateFontString(nil,"OVERLAY")
-shooty_export.title:SetPoint("TOP",0,0)
+shooty_export.title:SetPoint("TOP",0,-5)
 shooty_export.title:SetFont("Fonts\\FRIZQT__.TTF", 12)
 shooty_export.title:SetWidth(200)
 shooty_export.title:SetJustifyH("LEFT")
 shooty_export.title:SetJustifyV("CENTER")
-shooty_export.title:SetText("Ctrl-C to copy. Esc to close.")
-shooty_export.title:SetTextColor(204/255,204/255,0)
+shooty_export.title:SetText(C:Gold("Ctrl-C to copy. Esc to close."))
 shooty_export.title:SetShadowOffset(1, -1)
 shooty_export.edit = CreateFrame("EditBox", "shooty_exportedit", shooty_export)
 shooty_export.edit:SetMultiLine(true)
@@ -118,12 +122,30 @@ function sepgp_standings:Export()
   shooty_export.AddSelectText(txt)
 end
 
+function sepgp_standings:setHideScript()
+  local detachedFrame, tablet
+  for i=1,4 do
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",1))
+    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_standings" then
+      if not (tablet:GetScript("OnHide")) then
+        tablet:SetScript("OnHide",function()
+            if not T:IsAttached("sepgp_standings") then
+              T:Attach("sepgp_standings")
+              this:SetScript("OnHide",nil)
+            end
+          end)
+      end
+    end
+  end
+end
+
 function sepgp_standings:Toggle()
   if T:IsAttached("sepgp_standings") then
     T:Detach("sepgp_standings")
     if (T:IsLocked("sepgp_standings")) then
       T:ToggleLocked("sepgp_standings")
     end
+    self:setHideScript()
   else
     T:Attach("sepgp_standings")
   end
