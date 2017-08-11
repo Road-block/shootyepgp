@@ -383,7 +383,7 @@ local T = AceLibrary("Tablet-2.0")
 
 sepgp.defaultMinimapPosition = 180
 sepgp.cannotDetachTooltip = true
-sepgp.tooltipHidderWhenEmpty = false
+sepgp.tooltipHiddenWhenEmpty = false
 sepgp.hasIcon = "Interface\\Icons\\INV_Misc_Orb_04"
 
 function sepgp:OnTooltipUpdate()
@@ -1018,8 +1018,8 @@ StaticPopupDialogs["SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE"] = {
   hideOnEscape = 1  
 }
 StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET_GP"] = {
-  text = "Are you sure you want to Reset ALL GP?",
-  button1 = "|cffff0000"..TEXT(OKAY).."|r",
+  text = "|cffff0000Are you sure you want to Reset ALL GP?|r",
+  button1 = TEXT(OKAY),
   button2 = TEXT(CANCEL),
   OnAccept = function()
     sepgp:gp_reset()

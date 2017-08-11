@@ -22,6 +22,11 @@ function sepgp_logs:OnEnable()
           "tooltipText", "Refresh window",
           "func", function() sepgp_logs:Refresh() end
         )
+        D:AddLine(
+          "text", "Clear",
+          "tooltipText", "Clear Logs.",
+          "func", function() sepgp_log = {} sepgp_logs:Refresh() end
+        )
       end      
     )
   end
@@ -65,9 +70,6 @@ function sepgp_logs:Toggle(forceShow)
   elseif (forceShow) then
   else
     T:Attach("sepgp_logs")
-    if GameTooltip:IsOwned(self.tipOwner) and GameTooltip:IsShown() then
-      GameTooltip:Hide()
-    end
   end
 end
 
