@@ -777,6 +777,9 @@ lootCall.os = {
   "^(os)[%s%p%c]+.+",".+[%s%p%c]+(os)$",".+[%s%p%c]+(os)[%s%p%c]+.*",".*[%s%p%c]+(os)[%s%p%c]+.+", 
   ".+(offspec).*",".*(offspec).+"
 }
+lootCall.bs = { -- blacklist
+  "^(roll)[%s%p%c]+.+",".+[%s%p%c]+(roll)$",".*[%s%p%c]+(roll)[%s%p%c]+.*"
+}
 function sepgp:captureLootCall(text, sender)
   if not (IsRaidLeader() or self:lootMaster()) then return end
   if not sender == playerName then return end
@@ -784,7 +787,11 @@ function sepgp:captureLootCall(text, sender)
   local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r"," ; ")
   if count > 1 then return end
   local lowtext = string.lower(linkstriptext)
-  local whisperkw_found, mskw_found, oskw_found, link_found
+  local whisperkw_found, mskw_found, oskw_found, link_found, blacklist_found
+  for _,f in ipairs(lootCall.bs) do
+    blacklist_found = string.find(lowtext,f)
+    if (blacklist_found) then return end
+  end
   local _, itemLink, itemColor, itemString, itemName
   for _,f in ipairs(lootCall.whisp) do
     whisperkw_found = string.find(lowtext,f)
