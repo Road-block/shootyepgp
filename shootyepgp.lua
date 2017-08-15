@@ -352,11 +352,17 @@ function sepgp:decay_epgp() -- decays entire roster's ep and gp
     ep = tonumber(ep)
     gp = tonumber(gp)
     if ep == nil then 
-  	else 
-      ep = math.max(0,sepgp:num_round(ep*sepgp_decay))
-  	  GuildRosterSetPublicNote(i,ep)
-  	  gp = math.max(shooty_basegp,sepgp:num_round(gp*sepgp_decay))
-  	  GuildRosterSetOfficerNote(i,gp)
+    else 
+      if gp == nil then
+        local msg = string.format("%s\'s officernote is broken:%q",name,tostring(gp))
+        self:debugPrint(msg)
+        self:adminSay(msg)
+      else
+        ep = math.max(0,sepgp:num_round(ep*sepgp_decay))
+    	  GuildRosterSetPublicNote(i,ep)
+    	  gp = math.max(shooty_basegp,sepgp:num_round(gp*sepgp_decay))
+    	  GuildRosterSetOfficerNote(i,gp)
+      end
     end
   end
   local msg = string.format("All EP and GP decayed by %d%%",(1-sepgp_decay)*100)
