@@ -170,7 +170,7 @@ function sepgp:delayedInit()
   -- migrate EPGP storage if needed
   local _,_,major_ver = string.find((GetAddOnMetadata("shootyepgp","Version")),"^(%d+)%.[%d%.%-]+$")
   major_ver = tonumber(major_ver)
-  if --[[IsGuildLeader() and ]]( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
+  if IsGuildLeader() and ( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
     sepgp[string.format("v%dtov%d",(sepgp_dbver or 2),major_ver)](sepgp)
   end
   -- safe officer note setting when we are admin
