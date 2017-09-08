@@ -3,10 +3,10 @@
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: Roadblock
 ## X-Credits: shooty for original version
-## Version: 2.32
+## Version: 3.0
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
-## SavedVariablesPerCharacter: sepgp_log
+## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver
 
 Libs\AceLibrary\AceLibrary.lua
 Libs\AceOO-2.0\AceOO-2.0.lua
@@ -28,6 +28,7 @@ Libs\FuBarPlugin-2.0\FuBarPlugin-2.0.lua
 Libs\Tablet-2.0\Tablet-2.0.lua
 
 shootyepgp.lua
+migrations.lua
 standings.lua
 reserves.lua
 bids.lua

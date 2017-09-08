@@ -105,8 +105,8 @@ function sepgp_standings:Export()
   local t = {}
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-    local ep = sepgp:get_ep(name,note)
-    local gp = sepgp:get_gp(name,officernote)
+    local ep = (sepgp:get_ep_v3(name,officernote) or 0) --TODO: update v3
+    local gp = (sepgp:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --TODO: update v3
     if ep > 0 then
       table.insert(t,{name,ep,gp,ep/gp})
     end
@@ -176,8 +176,8 @@ function sepgp_standings:BuildStandingsTable()
   end
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-    local ep = sepgp:get_ep(name)
-    local gp = sepgp:get_gp(name)
+    local ep = (sepgp:get_ep_v3(name) or 0) --TODO: update v3
+    local gp = (sepgp:get_gp_v3(name) or sepgp.VARS.basegp) --TODO: update v3
     if ep > 0 then
       if (sepgp_raidonly) and next(r) then
         if r[name] then

@@ -2,21 +2,22 @@ sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2
 sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local BZ = AceLibrary("Babble-Zone-2.2")
-
+sepgp.VARS = {
+  basegp = 135,
+  baseawared_ep = 100,
+  decay = 0.85,
+  max = 5000,
+  timeout = 45,
+  maxloglines = 500
+}
 local playerName = (UnitName("player"))
-local shooty_basegp = 135
-local shooty_baseaward_ep = 100
-local shooty_decay = 0.85
-local shooty_max = 5000
-local shooty_timeout = 45
-local shooty_maxloglines = 300
 local shooty_reservechan = "Reserves"
-local shooty_reservecall = string.format("{shootyepgp}Type \"+\" in this channel if on main, or \"+<MainName>\" if on alt within %dsec.",shooty_timeout)
+local shooty_reservecall = string.format("{shootyepgp}Type \"+\" in this channel if on main, or \"+<MainName>\" if on alt within %dsec.",sepgp.VARS.timeout)
 local shooty_reserveanswer = "^(%+)(%a*)$"
 local out = "|cff9664c8shootyepgp:|r %s"
 local lastUpdate = 0
 local needInit = true
-local admin
+local admin,sanitizeNote
 local shooty_debugchat
 local running_check,running_bid
 local partyUnit,raidUnit = {},{}
@@ -40,7 +41,7 @@ sepgp.bids_main,sepgp.bids_off,sepgp.bid_item = {},{},{}
 
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_saychannel == nil then sepgp_saychannel = "GUILD" end
-  if sepgp_decay == nil then sepgp_decay = shooty_decay end
+  if sepgp_decay == nil then sepgp_decay = sepgp.VARS.decay end
   if sepgp_progress == nil then sepgp_progress = "T1" end
   if sepgp_discount == nil then sepgp_discount = 0.25 end
   if sepgp_log == nil then sepgp_log = {} end
@@ -65,7 +66,7 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   end
 
   if not self:IsEventScheduled("shootyepgpChannelInit") then
-    self:ScheduleEvent("shootyepgpChannelInit",self.getReserveStatus,2,self)
+    self:ScheduleEvent("shootyepgpChannelInit",self.delayedInit,2,self)
   end
 
   -- if pfUI loaded, skin the extra tooltip
@@ -154,7 +155,7 @@ function sepgp:TipHook()
   )
 end
 
-function sepgp:getReserveStatus()
+function sepgp:delayedInit()
   if (IsInGuild()) then
     local guildName = (GetGuildInfo("player"))
     if (guildName) and guildName ~= "" then
@@ -165,6 +166,18 @@ function sepgp:getReserveStatus()
   local reservesChannelID = tonumber((GetChannelName(sepgp_reservechannel)))
   if (reservesChannelID) and (reservesChannelID ~= 0) then
     sepgp:reservesToggle(true)
+  end
+  -- migrate EPGP storage if needed
+  local _,_,major_ver = string.find((GetAddOnMetadata("shootyepgp","Version")),"^(%d+)%.[%d%.%-]+$")
+  major_ver = tonumber(major_ver)
+  if --[[IsGuildLeader() and ]]( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
+    sepgp[string.format("v%dtov%d",(sepgp_dbver or 2),major_ver)](sepgp)
+  end
+  -- safe officer note setting when we are admin
+  if (admin()) then
+    if not self:IsHooked("GuildRosterSetOfficerNote") then
+      self:Hook("GuildRosterSetOfficerNote")
+    end
   end
 end
 
@@ -206,6 +219,24 @@ function sepgp:OnUpdate(elapsed)
   if lastUpdate > 0.5 then
     lastUpdate = 0
     sepgp_reserves:Refresh()
+  end
+end
+
+function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
+  if (fromAddon) then
+    self.hooks["GuildRosterSetOfficerNote"](index,note)
+  else
+    local name, _, _, _, _, _, _, prevnote, _, _ = GetGuildRosterInfo(index)
+    local _,_,_,oldepgp,_ = string.find(prevnote or "","(.*)({%d+:%d+})(.*)")
+    local _,_,_,epgp,_ = string.find(note or "","(.*)({%d+:%d+})(.*)")
+    if oldepgp ~= nil then
+      if epgp == nil or epgp ~= oldepgp then
+        self:adminSay(string.format("Manually modified %s\'s note. EPGP was %s",name,oldepgp))
+        self:defaultPrint(string.format("|cffff0000Manually modified %s\'s note. EPGP was %s|r",name,oldepgp))
+      end
+    end
+    local safenote = string.gsub(note,"(.*)({%d+:%d+})(.*)",sanitizeNote)
+    self.hooks["GuildRosterSetOfficerNote"](index,safenote)    
   end
 end
 
@@ -252,36 +283,93 @@ end
 ---------------------
 -- EPGP Operations
 ---------------------
-function sepgp:init_notes(guild_index,note,officernote)
+function sepgp:init_notes_v2(guild_index,note,officernote)
   if not tonumber(note) or (tonumber(note) < 0) then
     GuildRosterSetPublicNote(guild_index,0)
   end
-  if not tonumber(officernote) or (tonumber(officernote) < shooty_basegp) then
-    GuildRosterSetOfficerNote(guild_index,shooty_basegp)
+  if not tonumber(officernote) or (tonumber(officernote) < sepgp.VARS.basegp) then
+    GuildRosterSetOfficerNote(guild_index,sepgp.VARS.basegp,true)
   end
 end
 
-function sepgp:update_ep(getname,ep)
+function sepgp:init_notes_v3(guild_index,name,officernote)
+  local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
+  if not (ep and gp) then
+    local initstring = string.format("{%d:%d}",0,sepgp.VARS.basegp)
+    local newnote = string.format("%s%s",officernote,initstring)
+    newnote = string.gsub(newnote,"(.*)({%d+:%d+})(.*)",sanitizeNote)
+    officernote = newnote
+  else
+    officernote = string.gsub(officernote,"(.*)({%d+:%d+})(.*)",sanitizeNote)
+  end
+  GuildRosterSetOfficerNote(guild_index,officernote,true)
+end
+
+function sepgp:update_epgp_v3(ep,gp,guild_index,name,officernote)
+  self:init_notes_v3(guild_index,name,officernote)
+  local newnote
+  if (ep) then
+    ep = math.max(0,ep)
+    newnote = string.gsub(officernote,"(.*{)(%d+)(:)(%d+)(}.*)",function(head,oldep,divider,oldgp,tail)
+      return string.format("%s%s%s%s%s",head,ep,divider,oldgp,tail)
+      end)
+  end
+  if (gp) then
+    gp =  math.max(sepgp.VARS.basegp,gp)
+    if (newnote) then
+      newnote = string.gsub(newnote,"(.*{)(%d+)(:)(%d+)(}.*)",function(head,oldep,divider,oldgp,tail)
+        return string.format("%s%s%s%s%s",head,oldep,divider,gp,tail)
+        end)
+    else
+      newnote = string.gsub(officernote,"(.*{)(%d+)(:)(%d+)(}.*)",function(head,oldep,divider,oldgp,tail)
+        return string.format("%s%s%s%s%s",head,oldep,divider,gp,tail)
+        end)
+    end
+  end
+  if (newnote) then
+    GuildRosterSetOfficerNote(guild_index,newnote,true)
+  end
+end
+
+function sepgp:update_ep_v2(getname,ep)
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
     if (name==getname) then 
-      sepgp:init_notes(i,note,officernote)
+      sepgp:init_notes_v2(i,note,officernote)
       GuildRosterSetPublicNote(i,ep)
     end
   end
 end
 
-function sepgp:update_gp(getname,gp)
+function sepgp:update_ep_v3(getname,ep)
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
     if (name==getname) then 
-      sepgp:init_notes(i,note,officernote)
-      GuildRosterSetOfficerNote(i,gp) 
+      self:update_epgp_v3(ep,nil,i,name,officernote)
+    end
+  end  
+end
+
+function sepgp:update_gp_v2(getname,gp)
+  for i = 1, GetNumGuildMembers(1) do
+    local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
+    if (name==getname) then 
+      sepgp:init_notes_v2(i,note,officernote)
+      GuildRosterSetOfficerNote(i,gp,true) 
     end
   end
 end
 
-function sepgp:get_ep(getname,note) -- gets ep by name or note
+function sepgp:update_gp_v3(getname,gp)
+  for i = 1, GetNumGuildMembers(1) do
+    local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
+    if (name==getname) then 
+      self:update_epgp_v3(nil,gp,i,name,officernote) 
+    end
+  end  
+end
+
+function sepgp:get_ep_v2(getname,note) -- gets ep by name or note
   if (note) then
     if tonumber(note)==nil then return 0 end
   end
@@ -293,16 +381,42 @@ function sepgp:get_ep(getname,note) -- gets ep by name or note
   return(0)
 end
 
-function sepgp:get_gp(getname,officernote) -- gets gp by name or officernote
+function sepgp:get_ep_v3(getname,officernote) -- gets ep by name or note
   if (officernote) then
-    if tonumber(officernote)==nil then return shooty_basegp end
+    local _,_,ep = string.find(officernote,".*{(%d+):%d+}.*")
+    return tonumber(ep)
   end
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-    if tonumber(officernote)==nil then officernote=shooty_basegp end
+    local _,_,ep = string.find(officernote,".*{(%d+):%d+}.*")
+    if (name==getname) then return tonumber(ep) end
+  end
+  return
+end
+
+function sepgp:get_gp_v2(getname,officernote) -- gets gp by name or officernote
+  if (officernote) then
+    if tonumber(officernote)==nil then return sepgp.VARS.basegp end
+  end
+  for i = 1, GetNumGuildMembers(1) do
+    local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
+    if tonumber(officernote)==nil then officernote=sepgp.VARS.basegp end
     if (name==getname) then return tonumber(officernote) end
   end
-  return(shooty_basegp)
+  return(sepgp.VARS.basegp)
+end
+
+function sepgp:get_gp_v3(getname,officernote) -- gets gp by name or officernote
+  if (officernote) then
+    local _,_,gp = string.find(officernote,".*{%d+:(%d+)}.*")
+    return tonumber(gp)
+  end
+  for i = 1, GetNumGuildMembers(1) do
+    local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
+    local _,_,gp = string.find(officernote,".*{%d+:(%d+)}.*")
+    if (name==getname) then return tonumber(gp) end
+  end
+  return
 end
 
 function sepgp:award_raid_ep(ep) -- awards ep to raid members in zone
@@ -331,21 +445,21 @@ end
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
   if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d ep to %s",ep,getname))
-  ep = ep + sepgp:get_ep(getname)
-  sepgp:update_ep(getname,ep)
+  ep = ep + (sepgp:get_ep_v3(getname) or 0) --TODO: update v3
+  sepgp:update_ep_v3(getname,ep) --TODO: update v3
 end
 
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
   if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d gp to %s",gp,getname))
-  local oldgp = sepgp:get_gp(getname)
+  local oldgp = (sepgp:get_gp_v3(getname) or sepgp.VARS.basegp) --TODO: update v3
   local newgp = gp + oldgp
   sepgp:adminSay(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
   self:addToLog(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
-  sepgp:update_gp(getname,newgp)
+  sepgp:update_gp_v3(getname,newgp) --TODO: update v3
 end
 
-function sepgp:decay_epgp() -- decays entire roster's ep and gp
+function sepgp:decay_epgp_v2() -- decays entire roster's ep and gp
   if not (admin()) then return end
   for i = 1, GetNumGuildMembers(1) do
     local name,_,_,_,class,_,ep,gp,_,_ = GetGuildRosterInfo(i)
@@ -360,8 +474,8 @@ function sepgp:decay_epgp() -- decays entire roster's ep and gp
       else
         ep = math.max(0,sepgp:num_round(ep*sepgp_decay))
     	  GuildRosterSetPublicNote(i,ep)
-    	  gp = math.max(shooty_basegp,sepgp:num_round(gp*sepgp_decay))
-    	  GuildRosterSetOfficerNote(i,gp)
+    	  gp = math.max(sepgp.VARS.basegp,sepgp:num_round(gp*sepgp_decay))
+    	  GuildRosterSetOfficerNote(i,gp,true)
       end
     end
   end
@@ -371,14 +485,46 @@ function sepgp:decay_epgp() -- decays entire roster's ep and gp
   self:addToLog(msg)
 end
 
-function sepgp:gp_reset()
+function sepgp:decay_epgp_v3()
+  if not (admin()) then return end
+  for i = 1, GetNumGuildMembers(1) do
+    local name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
+    local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
+    if (ep and gp) then
+      ep = sepgp:num_round(ep*sepgp_decay)
+      gp = sepgp:num_round(gp*sepgp_decay)
+      sepgp:update_epgp_v3(ep,gp,i,name,officernote)
+    end
+  end
+  local msg = string.format("All EP and GP decayed by %d%%",(1-sepgp_decay)*100)
+  sepgp:simpleSay(msg)
+  if not (sepgp_saychannel=="OFFICER") then sepgp:adminSay(msg) end
+  self:addToLog(msg)  
+end
+
+function sepgp:gp_reset_v2()
   if (IsGuildLeader()) then
     for i = 1, GetNumGuildMembers(1) do
-      GuildRosterSetOfficerNote(i, shooty_basegp)
+      GuildRosterSetOfficerNote(i, sepgp.VARS.basegp,true)
     end
-    sepgp:debugPrint(string.format("All GP has been reset to %d.",shooty_basegp))
-    self:adminSay(string.format("All GP has been reset to %d.",shooty_basegp))
-    self:addToLog(string.format("All GP has been reset to %d.",shooty_basegp))
+    sepgp:debugPrint(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    self:adminSay(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    self:addToLog(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+  end
+end
+
+function sepgp:gp_reset_v3()
+  if (IsGuildLeader()) then
+    for i = 1, GetNumGuildMembers(1) do
+      local name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
+      local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
+      if (ep and gp) then
+        sepgp:update_epgp_v3(ep,sepgp.VARS.basegp,i,name,officernote)
+      end
+    end    
+    sepgp:debugPrint(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    self:adminSay(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    self:addToLog(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
   end
 end
 
@@ -477,7 +623,7 @@ function sepgp:buildClassMemberTable(roster,epgp)
         c[class].args[name].get = false
         c[class].args[name].set = function(v) sepgp:givename_gp(name, tonumber(v)) end
       end
-      c[class].args[name].validate = function(v) return (type(v) == "number" or tonumber(v)) and tonumber(v) < shooty_max end
+      c[class].args[name].validate = function(v) return (type(v) == "number" or tonumber(v)) and tonumber(v) < sepgp.VARS.max end
     end
   end
   return c
@@ -510,7 +656,7 @@ function sepgp:buildMenu()
       hidden = function() return not (admin()) end,
       validate = function(v)
         local n = tonumber(v)
-        return n and n >= 0 and n < shooty_max
+        return n and n >= 0 and n < sepgp.VARS.max
       end
     }
     options.args["gp"] = {
@@ -531,7 +677,7 @@ function sepgp:buildMenu()
       hidden = function() return not (admin()) end,
       validate = function(v)
         local n = tonumber(v)
-        return n and n >= 0 and n < shooty_max
+        return n and n >= 0 and n < sepgp.VARS.max
       end    
     }
     options.args["reserves"] = {
@@ -593,10 +739,10 @@ function sepgp:buildMenu()
     options.args["decay"] = {
       type = "execute",
       name = "Decay EPGP",
-      desc = string.format("Decays all EPGP by %d%%",(1-(sepgp_decay or shooty_decay))*100),
+      desc = string.format("Decays all EPGP by %d%%",(1-(sepgp_decay or sepgp.VARS.decay))*100),
       order = 100,
       hidden = function() return not (admin()) end,
-      func = function() sepgp:decay_epgp() end
+      func = function() sepgp:decay_epgp_v3() end --TODO: update v3
     }    
     options.args["set_decay"] = {
       type = "range",
@@ -628,7 +774,7 @@ function sepgp:buildMenu()
     options.args["reset"] = {
      type = "execute",
      name = "Reset GP",
-     desc = string.format("gives everybody %d basic GP (Admin only).",shooty_basegp),
+     desc = string.format("gives everybody %d basic GP (Admin only).",sepgp.VARS.basegp),
      order = 120,
      hidden = function() return not (IsGuildLeader()) end,
      func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET_GP") end
@@ -699,7 +845,7 @@ function sepgp:afkcheck_reserves()
     reserves_blacklist = {}
     sepgp.reserves = {}
     running_check = true
-    sepgp.timer.count_down = shooty_timeout
+    sepgp.timer.count_down = sepgp.VARS.timeout
     sepgp.timer:Show()
     SendChatMessage(shooty_reservecall,"CHANNEL",nil,sepgp.reservesChannelID)
     sepgp_reserves:Toggle(true)
@@ -852,8 +998,8 @@ function sepgp:captureBid(text, sender)
         for i = 1, GetNumGuildMembers(1) do
           local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
           if name == sender then
-            local ep = self:get_ep(name,note)
-            local gp = self:get_gp(name,officernote)
+            local ep = (self:get_ep_v3(name,officernote) or 0) --TODO: update v3
+            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --TODO: update v3
             if (mskw_found) then
               bids_blacklist[sender] = true
               table.insert(sepgp.bids_main,{name,class,ep,gp,ep/gp})
@@ -889,7 +1035,7 @@ end
 ------------
 
 function sepgp:addToLog(line,skipTime)
-  local over = table.getn(sepgp_log)-shooty_maxloglines+1
+  local over = table.getn(sepgp_log)-sepgp.VARS.maxloglines+1
   if over > 0 then
     for i=1,over do
       table.remove(sepgp_log,1)
@@ -966,19 +1112,27 @@ function sepgp:suggestedAwardEP()
     end
   end
   if not currentTier then 
-    return shooty_baseaward_ep
+    return sepgp.VARS.baseaward_ep
   else
     multiplier = zone_multipliers[sepgp_progress][currentTier]
   end
   if (multiplier) then
-    return multiplier*shooty_baseaward_ep
+    return multiplier*sepgp.VARS.baseaward_ep
   else
-    return shooty_baseaward_ep
+    return sepgp.VARS.baseaward_ep
   end
 end
 
 admin = function()
   return (CanEditOfficerNote() and CanEditPublicNote())
+end
+
+sanitizeNote = function(prefix,epgp,postfix)
+  -- reserve 11 chars for the epgp pattern {xxxx:yyyy} max public/officernote = 31
+  local remainder = string.format("%s%s",prefix,postfix)
+  local clip = math.min(31-11,string.len(remainder))
+  local prepend = string.sub(remainder,1,clip)
+  return string.format("%s%s",prepend,epgp)
 end
 
 -------------
@@ -1024,7 +1178,7 @@ StaticPopupDialogs["SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE"] = {
   OnAccept = function()
     sepgp:sendReserverResponce()
   end,
-  timeout = shooty_timeout,
+  timeout = sepgp.VARS.timeout,
   exclusive = 1,
   showAlert = 1,
   whileDead = 1,
@@ -1035,7 +1189,7 @@ StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET_GP"] = {
   button1 = TEXT(OKAY),
   button2 = TEXT(CANCEL),
   OnAccept = function()
-    sepgp:gp_reset()
+    sepgp:gp_reset_v2()
   end,
   timeout = 0,
   whileDead = 1,
