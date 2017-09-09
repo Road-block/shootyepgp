@@ -303,10 +303,11 @@ function sepgp:init_notes_v3(guild_index,name,officernote)
     officernote = string.gsub(officernote,"(.*)({%d+:%d+})(.*)",sanitizeNote)
   end
   GuildRosterSetOfficerNote(guild_index,officernote,true)
+  return officernote
 end
 
 function sepgp:update_epgp_v3(ep,gp,guild_index,name,officernote)
-  self:init_notes_v3(guild_index,name,officernote)
+  officernote = self:init_notes_v3(guild_index,name,officernote)
   local newnote
   if (ep) then
     ep = math.max(0,ep)
@@ -445,18 +446,24 @@ end
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
   if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d ep to %s",ep,getname))
-  ep = ep + (sepgp:get_ep_v3(getname) or 0) --TODO: update v3
-  sepgp:update_ep_v3(getname,ep) --TODO: update v3
+  if ep < 0 then -- inform admins of penalties
+    local msg = string.format("%s EP Penalty to %s.",ep,getname)
+    sepgp:adminSay(msg)
+    self:addToLog(msg)
+  end
+  ep = ep + (sepgp:get_ep_v3(getname) or 0) --DONE: update v3
+  sepgp:update_ep_v3(getname,ep) --DONE: update v3
 end
 
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
   if not (admin()) then return end
   sepgp:debugPrint(string.format("Giving %d gp to %s",gp,getname))
-  local oldgp = (sepgp:get_gp_v3(getname) or sepgp.VARS.basegp) --TODO: update v3
+  local oldgp = (sepgp:get_gp_v3(getname) or sepgp.VARS.basegp) --DONE: update v3
   local newgp = gp + oldgp
-  sepgp:adminSay(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
-  self:addToLog(string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,newgp))
-  sepgp:update_gp_v3(getname,newgp) --TODO: update v3
+  local msg = string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,math.max(sepgp.VARS.basegp,newgp))
+  sepgp:adminSay(msg)
+  self:addToLog(msg)
+  sepgp:update_gp_v3(getname,newgp) --DONE: update v3
 end
 
 function sepgp:decay_epgp_v2() -- decays entire roster's ep and gp
@@ -496,7 +503,7 @@ function sepgp:decay_epgp_v3()
       sepgp:update_epgp_v3(ep,gp,i,name,officernote)
     end
   end
-  local msg = string.format("All EP and GP decayed by %d%%",(1-sepgp_decay)*100)
+  local msg = string.format("All EP and GP decayed by %s%%",(1-sepgp_decay)*100)
   sepgp:simpleSay(msg)
   if not (sepgp_saychannel=="OFFICER") then sepgp:adminSay(msg) end
   self:addToLog(msg)  
@@ -739,10 +746,10 @@ function sepgp:buildMenu()
     options.args["decay"] = {
       type = "execute",
       name = "Decay EPGP",
-      desc = string.format("Decays all EPGP by %d%%",(1-(sepgp_decay or sepgp.VARS.decay))*100),
+      desc = string.format("Decays all EPGP by %s%%",(1-(sepgp_decay or sepgp.VARS.decay))*100),
       order = 100,
       hidden = function() return not (admin()) end,
-      func = function() sepgp:decay_epgp_v3() end --TODO: update v3
+      func = function() sepgp:decay_epgp_v3() end --DONE: update v3
     }    
     options.args["set_decay"] = {
       type = "range",
@@ -751,7 +758,10 @@ function sepgp:buildMenu()
       order = 110,
       usage = "<Decay>",
       get = function() return (1.0-sepgp_decay) end,
-      set = function(v) sepgp_decay = (1 - v) end,
+      set = function(v) 
+        sepgp_decay = (1 - v)
+        options.args["decay"].desc = string.format("Decays all EPGP by %s%%",(1-sepgp_decay)*100)
+      end,
       min = 0.01,
       max = 0.5,
       step = 0.01,
@@ -998,8 +1008,8 @@ function sepgp:captureBid(text, sender)
         for i = 1, GetNumGuildMembers(1) do
           local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
           if name == sender then
-            local ep = (self:get_ep_v3(name,officernote) or 0) --TODO: update v3
-            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --TODO: update v3
+            local ep = (self:get_ep_v3(name,officernote) or 0) --DONE: update v3
+            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --DONE: update v3
             if (mskw_found) then
               bids_blacklist[sender] = true
               table.insert(sepgp.bids_main,{name,class,ep,gp,ep/gp})
