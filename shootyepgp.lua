@@ -609,7 +609,7 @@ function sepgp:buildClassMemberTable(roster,epgp)
   local c = { }
   for i,member in ipairs(roster) do
     local class,name = member.class, member.name
-    if c[class] == nil then
+    if (class) and (c[class] == nil) then
       c[class] = { }
       c[class].type = "group"
       c[class].name = class
@@ -617,7 +617,7 @@ function sepgp:buildClassMemberTable(roster,epgp)
       c[class].hidden = function() return not (admin()) end
       c[class].args = { }
     end
-    if c[class].args[name] == nil then
+    if (name) and (c[class].args[name] == nil) then
       c[class].args[name] = { }
       c[class].args[name].type = "text"
       c[class].args[name].name = name
