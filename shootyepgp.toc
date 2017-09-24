@@ -3,7 +3,7 @@
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: Roadblock
 ## X-Credits: shooty for original version
-## Version: 3.11
+## Version: 3.12
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
 ## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver
@@ -12,7 +12,7 @@ Libs\AceLibrary\AceLibrary.lua
 Libs\AceOO-2.0\AceOO-2.0.lua
 Libs\AceEvent-2.0\AceEvent-2.0.lua
 Libs\AceAddon-2.0\AceAddon-2.0.lua
-Libs\AceHook-2.0\AceHook-2.0.lua
+Libs\AceHook-2.1\AceHook-2.1.lua
 Libs\AceConsole-2.0\AceConsole-2.0.lua
 Libs\AceModuleCore-2.0\AceModuleCore-2.0.lua
 Libs\AceDB-2.0\AceDB-2.0.lua

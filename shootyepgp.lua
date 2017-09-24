@@ -22,6 +22,10 @@ local shooty_debugchat
 local running_check,running_bid
 local partyUnit,raidUnit = {},{}
 local reserves_blacklist,bids_blacklist = {},{}
+local bidlink = {
+  ["ms"]="|cffFF3333|Hshootybid:1:$ML|h[Mainspec/Need]|h|r",
+  ["os"]="|cff009900|Hshootybid:2:$ML|h[Offspec/Greed]|h|r"
+}
 do
   for i=1,40 do
     raidUnit[i] = "raid"..i
@@ -73,9 +77,10 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
     pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,pfUI_config.tooltip.alpha)
   end
+  -- hook SetItemRef to parse our client bid links
+  self:Hook("SetItemRef")
   -- hook tooltip to add our GP values
   sepgp:TipHook()
-
   -- make tablets closable with ESC
   for i=1,4 do
     table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
@@ -130,7 +135,7 @@ function sepgp:TipHook()
     sepgp:AddDataToTooltip(GameTooltip, GetLootRollItemLink(id))
   end
   ) 
-  self:SecureHook("SetItemRef", function(link, name, button)
+  --[[self:SecureHook("SetItemRef", function(link, name, button)
     if (link and name and ItemRefTooltip) then
       if (strsub(link, 1, 6) ~= "Player") then
         if (ItemRefTooltip:IsVisible()) then
@@ -142,7 +147,7 @@ function sepgp:TipHook()
       end
     end
   end
-  ) 
+  )]] 
   self:HookScript(GameTooltip, "OnHide", function()
     if sepgp.extratip:IsVisible() then sepgp.extratip:Hide() end
     self.hooks[GameTooltip]["OnHide"]()
@@ -240,6 +245,37 @@ function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
   end
 end
 
+function sepgp:SetItemRef(link, name, button)
+  if string.sub(link,1,9) == "shootybid" then
+    local _,_,bid,masterlooter = string.find(link,"shootybid:(%d+):(%w+)")
+    if bid == "1" then
+      bid = "+"
+    elseif bid == "2" then
+      bid = "-"
+    else
+      bid = nil
+    end
+    if not sepgp:inRaid(masterlooter) then
+      masterlooter = nil
+    end
+    if (bid and masterlooter) then
+      SendChatMessage(bid,"WHISPER",nil,masterlooter)
+    end
+    return
+  end
+  self.hooks["SetItemRef"](link, name, button)
+  if (link and name and ItemRefTooltip) then
+    if (strsub(link, 1, 4) == "item") then
+      if (ItemRefTooltip:IsVisible()) then
+        if (not DressUpFrame:IsVisible()) then
+          sepgp:AddDataToTooltip(ItemRefTooltip, link)
+        end
+        ItemRefTooltip.isDisplayDone = nil
+      end
+    end
+  end
+end
+
 -------------------
 -- Communication
 -------------------
@@ -266,6 +302,39 @@ function sepgp:defaultPrint(msg)
     FCF_SelectDockFrame(DEFAULT_CHAT_FRAME)
   end
   DEFAULT_CHAT_FRAME:AddMessage(string.format(out,msg))
+end
+
+function sepgp:bidPrint(link,masterlooter,need,greed,bid)
+  local mslink = string.gsub(bidlink["ms"],"$ML",masterlooter)
+  local oslink = string.gsub(bidlink["os"],"$ML",masterlooter)
+  local msg = string.format("Click to bid $MS or $OS for %s",link)
+  if (need and greed) then
+    msg = string.gsub(msg,"$MS",mslink)
+    msg = string.gsub(msg,"$OS",oslink)
+  elseif (need) then
+    msg = string.gsub(msg,"$MS",mslink)
+    msg = string.gsub(msg,"or $OS ","")
+  elseif (greed) then
+    msg = string.gsub(msg,"$OS",oslink)
+    msg = string.gsub(msg,"$MS or ","")
+  elseif (bid) then
+    msg = string.gsub(msg,"$MS",mslink)
+    msg = string.gsub(msg,"$OS",oslink)  
+  end
+  local _, count = string.gsub(msg,"%$","%$")
+  if (count > 0) then return end
+  local chatframe
+  if (SELECTED_CHAT_FRAME) then
+    chatframe = SELECTED_CHAT_FRAME
+  else
+    if not DEFAULT_CHAT_FRAME:IsVisible() then
+      FCF_SelectDockFrame(DEFAULT_CHAT_FRAME)
+    end
+    chatframe = DEFAULT_CHAT_FRAME
+  end
+  if (chatframe) then
+    chatframe:AddMessage(string.format(out,msg))
+  end
 end
 
 function sepgp:simpleSay(msg)
@@ -526,12 +595,13 @@ function sepgp:gp_reset_v3()
       local name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
       local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
       if (ep and gp) then
-        sepgp:update_epgp_v3(ep,sepgp.VARS.basegp,i,name,officernote)
+        sepgp:update_epgp_v3(0,sepgp.VARS.basegp,i,name,officernote)
       end
-    end    
-    sepgp:debugPrint(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
-    self:adminSay(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
-    self:addToLog(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    end
+    local msg = "All EP and GP has been reset to 0/%d."
+    sepgp:debugPrint(string.format(msg,sepgp.VARS.basegp))
+    self:adminSay(string.format(msg,sepgp.VARS.basegp))
+    self:addToLog(string.format(msg,sepgp.VARS.basegp))
   end
 end
 
@@ -943,8 +1013,6 @@ lootCall.bs = { -- blacklist
   "^(roll)[%s%p%c]+.+",".+[%s%p%c]+(roll)$",".*[%s%p%c]+(roll)[%s%p%c]+.*"
 }
 function sepgp:captureLootCall(text, sender)
-  if not (IsRaidLeader() or self:lootMaster()) then return end
-  if not sender == playerName then return end
   if not (string.find(text, "|Hitem:", 1, true)) then return end
   local linkstriptext, count = string.gsub(text,"|c%x+|H[eimt:%d]+|h%[[%w%s',%-]+%]|h|r"," ; ")
   if count > 1 then return end
@@ -973,14 +1041,17 @@ function sepgp:captureLootCall(text, sender)
       link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
     end
     if (link_found) then
-      self:clearBids()
-      sepgp.bid_item.link = itemString
-      sepgp.bid_item.linkFull = itemLink
-      sepgp.bid_item.name = string.format("%s%s|r",itemColor,itemName)
-      self:ScheduleEvent("shootyepgpBidTimeout",self.clearBids,360,self)
-      running_bid = true
-      self:debugPrint("Capturing Bids for 6min.")
-      sepgp_bids:Toggle(true)
+      if (IsRaidLeader() or self:lootMaster()) and (sender == playerName) then
+        self:clearBids()
+        sepgp.bid_item.link = itemString
+        sepgp.bid_item.linkFull = itemLink
+        sepgp.bid_item.name = string.format("%s%s|r",itemColor,itemName)
+        self:ScheduleEvent("shootyepgpBidTimeout",self.clearBids,360,self)
+        running_bid = true
+        self:debugPrint("Capturing Bids for 6min.")
+        sepgp_bids:Toggle(true)
+      end
+      sepgp:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
     end
   end
 end
@@ -1028,7 +1099,7 @@ function sepgp:captureBid(text, sender)
 end
 
 function sepgp:clearBids()
-  sepgp:defaultPrint("clearBids")
+  sepgp:debugPrint("clearing old Bids")
   sepgp.bid_item = {}
   sepgp.bids_main = {}
   sepgp.bids_off = {}
