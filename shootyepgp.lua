@@ -23,8 +23,8 @@ local running_check,running_bid
 local partyUnit,raidUnit = {},{}
 local reserves_blacklist,bids_blacklist = {},{}
 local bidlink = {
-  ["ms"]="|cffFF3333|Hshootybid:1:$ML|h[Mainspec/Need]|h|r",
-  ["os"]="|cff009900|Hshootybid:2:$ML|h[Offspec/Greed]|h|r"
+  ["ms"]="|cffFF3333|Hshootybid:1:$ML|h[Mainspec/NEED]|h|r",
+  ["os"]="|cff009900|Hshootybid:2:$ML|h[Offspec/GREED]|h|r"
 }
 do
   for i=1,40 do
@@ -307,7 +307,7 @@ end
 function sepgp:bidPrint(link,masterlooter,need,greed,bid)
   local mslink = string.gsub(bidlink["ms"],"$ML",masterlooter)
   local oslink = string.gsub(bidlink["os"],"$ML",masterlooter)
-  local msg = string.format("Click to bid $MS or $OS for %s",link)
+  local msg = string.format("Click $MS or $OS for %s",link)
   if (need and greed) then
     msg = string.gsub(msg,"$MS",mslink)
     msg = string.gsub(msg,"$OS",oslink)
@@ -333,7 +333,8 @@ function sepgp:bidPrint(link,masterlooter,need,greed,bid)
     chatframe = DEFAULT_CHAT_FRAME
   end
   if (chatframe) then
-    chatframe:AddMessage(string.format(out,msg))
+    chatframe:AddMessage(" ")
+    chatframe:AddMessage(string.format(out,msg),NORMAL_FONT_COLOR.r,NORMAL_FONT_COLOR.g,NORMAL_FONT_COLOR.b)
   end
 end
 
@@ -1209,9 +1210,9 @@ admin = function()
 end
 
 sanitizeNote = function(prefix,epgp,postfix)
-  -- reserve 11 chars for the epgp pattern {xxxx:yyyy} max public/officernote = 31
+  -- reserve 12 chars for the epgp pattern {xxxx:yyyy} max public/officernote = 31
   local remainder = string.format("%s%s",prefix,postfix)
-  local clip = math.min(31-11,string.len(remainder))
+  local clip = math.min(31-12,string.len(remainder))
   local prepend = string.sub(remainder,1,clip)
   return string.format("%s%s",prepend,epgp)
 end
