@@ -21,6 +21,7 @@ local admin,sanitizeNote
 local shooty_debugchat
 local running_check,running_bid
 local partyUnit,raidUnit = {},{}
+local hexColorQuality = {}
 local reserves_blacklist,bids_blacklist = {},{}
 local bidlink = {
   ["ms"]="|cffFF3333|Hshootybid:1:$ML|h[Mainspec/NEED]|h|r",
@@ -32,6 +33,9 @@ do
   end
   for i=1,4 do
     partyUnit[i] = "party"..i
+  end
+  for i=-1,6 do
+    hexColorQuality[ITEM_QUALITY_COLORS[i].hex] = i
   end
 end
 
@@ -135,19 +139,6 @@ function sepgp:TipHook()
     sepgp:AddDataToTooltip(GameTooltip, GetLootRollItemLink(id))
   end
   ) 
-  --[[self:SecureHook("SetItemRef", function(link, name, button)
-    if (link and name and ItemRefTooltip) then
-      if (strsub(link, 1, 6) ~= "Player") then
-        if (ItemRefTooltip:IsVisible()) then
-          if (not DressUpFrame:IsVisible()) then
-            sepgp:AddDataToTooltip(ItemRefTooltip, link)
-          end
-          ItemRefTooltip.isDisplayDone = nil
-        end
-      end
-    end
-  end
-  )]] 
   self:HookScript(GameTooltip, "OnHide", function()
     if sepgp.extratip:IsVisible() then sepgp.extratip:Hide() end
     self.hooks[GameTooltip]["OnHide"]()
@@ -348,6 +339,20 @@ function sepgp:adminSay(msg)
   -- if (officer_speak) then
   SendChatMessage(string.format("shootyepgp: %s",msg),"OFFICER")
   -- end
+end
+
+function sepgp:widestAudience(msg)
+  local channel = "SAY"
+  if UnitInRaid("player") then
+    if (IsRaidLeader() or IsRaidOfficer()) then
+      channel = "RAID_WARNING"
+    else
+      channel = "RAID"
+    end
+  elseif UnitExists("party1") then
+    channel = "PARTY"
+  end
+  SendChatMessage(msg, channel)
 end
 
 ---------------------
@@ -798,7 +803,7 @@ function sepgp:buildMenu()
     options.args["progress_tier"] = {
       type = "text",
       name = "Raid Progress",
-      desc = "Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.",
+      desc = "Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.\nUsed for suggested EP awards.",
       order = 90,
       get = function() return sepgp_progress end,
       set = function(v) sepgp_progress = v sepgp_bids:Refresh() end,
@@ -843,7 +848,7 @@ function sepgp:buildMenu()
     options.args["set_discount"] = {
       type = "range",
       name = "Offspec Price %",
-      desc = "Set Offspec / Resistance Items GP Percent.",
+      desc = "Set Offspec Items GP Percent.",
       order = 115,
       get = function() return sepgp_discount end,
       set = function(v) sepgp_discount = v end,
@@ -855,10 +860,10 @@ function sepgp:buildMenu()
     options.args["reset"] = {
      type = "execute",
      name = "Reset GP",
-     desc = string.format("gives everybody %d basic GP (Admin only).",sepgp.VARS.basegp),
+     desc = string.format("Resets everyone\'s EPGP to 0/%d (Admin only).",sepgp.VARS.basegp),
      order = 120,
      hidden = function() return not (IsGuildLeader()) end,
-     func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET_GP") end
+     func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET") end
     }
   end
   if (needInit) or (needRefresh) then
@@ -1042,17 +1047,20 @@ function sepgp:captureLootCall(text, sender)
       link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
     end
     if (link_found) then
-      if (IsRaidLeader() or self:lootMaster()) and (sender == playerName) then
-        self:clearBids()
-        sepgp.bid_item.link = itemString
-        sepgp.bid_item.linkFull = itemLink
-        sepgp.bid_item.name = string.format("%s%s|r",itemColor,itemName)
-        self:ScheduleEvent("shootyepgpBidTimeout",self.clearBids,360,self)
-        running_bid = true
-        self:debugPrint("Capturing Bids for 6min.")
-        sepgp_bids:Toggle(true)
+      local quality = hexColorQuality[itemColor] or -1
+      if (quality >= 3) then
+        if (IsRaidLeader() or self:lootMaster()) and (sender == playerName) then
+          self:clearBids(true)
+          sepgp.bid_item.link = itemString
+          sepgp.bid_item.linkFull = itemLink
+          sepgp.bid_item.name = string.format("%s%s|r",itemColor,itemName)
+          self:ScheduleEvent("shootyepgpBidTimeout",self.clearBids,300,self)
+          running_bid = true
+          self:debugPrint("Capturing Bids for 5min.")
+          sepgp_bids:Toggle(true)
+        end
+        sepgp:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
       end
-      sepgp:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
     end
   end
 end
@@ -1090,7 +1098,6 @@ function sepgp:captureBid(text, sender)
               table.insert(sepgp.bids_off,{name,class,ep,gp,ep/gp})
             end
             sepgp_bids:Toggle(true)
-            sepgp_bids:Refresh()
             return
           end
         end
@@ -1099,8 +1106,10 @@ function sepgp:captureBid(text, sender)
   end
 end
 
-function sepgp:clearBids()
-  sepgp:debugPrint("clearing old Bids")
+function sepgp:clearBids(reset)
+  if reset~=nil then
+    sepgp:debugPrint("Clearing old Bids")
+  end
   sepgp.bid_item = {}
   sepgp.bids_main = {}
   sepgp.bids_off = {}
@@ -1109,6 +1118,7 @@ function sepgp:clearBids()
     self:CancelScheduledEvent("shootyepgpBidTimeout")
   end
   running_bid = false
+  sepgp_bids._counterText = ""
   sepgp_bids:Refresh()
 end
 
@@ -1210,7 +1220,7 @@ admin = function()
 end
 
 sanitizeNote = function(prefix,epgp,postfix)
-  -- reserve 12 chars for the epgp pattern {xxxx:yyyy} max public/officernote = 31
+  -- reserve 12 chars for the epgp pattern {xxxxx:yyyy} max public/officernote = 31
   local remainder = string.format("%s%s",prefix,postfix)
   local clip = math.min(31-12,string.len(remainder))
   local prepend = string.sub(remainder,1,clip)
@@ -1266,12 +1276,12 @@ StaticPopupDialogs["SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE"] = {
   whileDead = 1,
   hideOnEscape = 1  
 }
-StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET_GP"] = {
-  text = "|cffff0000Are you sure you want to Reset ALL GP?|r",
+StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET"] = {
+  text = "|cffff0000Are you sure you want to Reset ALL EPGP?|r",
   button1 = TEXT(OKAY),
   button2 = TEXT(CANCEL),
   OnAccept = function()
-    sepgp:gp_reset_v2()
+    sepgp:gp_reset_v3()
   end,
   timeout = 0,
   whileDead = 1,

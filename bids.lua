@@ -4,9 +4,7 @@ local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
 
-sepgp_bids = sepgp:NewModule("sepgp_bids", "AceDB-2.0")
-sepgp_bids.tipOwner = CreateFrame("Frame","shootyepgp_bids_tipowner",UIParent)
-sepgp_bids.tipOwner:Show()
+sepgp_bids = sepgp:NewModule("sepgp_bids", "AceDB-2.0", "AceEvent-2.0")
 
 function sepgp_bids:OnEnable()
   if not T:IsRegistered("sepgp_bids") then
@@ -43,7 +41,7 @@ end
 function sepgp_bids:setHideScript()
   local detachedFrame, tablet
   for i=1,4 do
-    tablet = getglobal(string.format("Tablet20DetachedFrame%d",1))
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
     if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_bids" then
       if not (tablet:GetScript("OnHide")) then
         tablet:SetScript("OnHide",function()
@@ -64,52 +62,51 @@ function sepgp_bids:Toggle(forceShow)
       T:ToggleLocked("sepgp_bids")
     end
     self:setHideScript()
-    --[[if not (sepgp:IsEventScheduled("shootyepgpBidRefresh")) then
-      sepgp:ScheduleRepeatingEvent("shootyepgpBidRefresh", self.Refresh, 5, self)
-    end]]
   elseif (forceShow) then
+    sepgp_bids:Refresh()
   else
     T:Attach("sepgp_bids")
-    if GameTooltip:IsOwned(self.tipOwner) and GameTooltip:IsShown() then
-      GameTooltip:Hide()
-    end
-    --[[if (sepgp:IsEventScheduled("shootyepgpBidRefresh")) then
-      sepgp:CancelScheduledEvent("shootyepgpBidRefresh")
-    end]]
   end
-end
-
-function sepgp_bids:lineTooltip(item,line)
-  if line and line.highlight then
-    if not sepgp:IsHooked(line.highlight,"Show") then
-      sepgp:SecureHook(line.highlight,"Show",function()
-        if not (GameTooltip:IsOwned(sepgp_bids.tipOwner) and GameTooltip:IsShown()) then
-          GameTooltip:SetOwner(sepgp_bids.tipOwner,"ANCHOR_CURSOR")
-          GameTooltip:SetHyperlink(item)
-          GameTooltip:Show()
-        end
-      end)
-    end
-    if not sepgp:IsHooked(line.highlight,"Hide") then
-      sepgp:SecureHook(line.highlight,"Hide",function()
-        if GameTooltip:IsOwned(sepgp_bids.tipOwner) and GameTooltip:IsShown() then
-          GameTooltip:Hide()
-        end
-      end)
-    end
-  end  
 end
 
 function sepgp_bids:announceWinnerMS(name, pr)
   if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Highest MainSpec Bid is %s with %.03fPR",name,pr),"RAID")
+    SendChatMessage(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr),"RAID")
   end
 end
 
 function sepgp_bids:announceWinnerOS(name, pr)
   if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Highest OffSpec Bid is %s with %.03fPR",name,pr),"RAID")
+    SendChatMessage(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr),"RAID")
   end
+end
+
+function sepgp_bids:countdownCounter()
+  self._counter = (self._counter or 6) - 1
+  if GetNumRaidMembers()>0 and self._counter > 0 then
+    self._counterText = C:Yellow(tostring(self._counter))
+    SendChatMessage(tostring(self._counter),"RAID")
+    self:Refresh()
+  end
+end
+
+function sepgp_bids:countdownFinish(reset)
+  if self:IsEventScheduled("shootyepgpBidCountdown") then
+    self:CancelScheduledEvent("shootyepgpBidCountdown")
+  end
+  self._counter = 6
+  if (reset) then
+    self._counterText = C:Green("Starting")
+  else
+    self._counterText = C:Red("Finished")
+  end
+  self:Refresh()
+end
+
+function sepgp_bids:bidCountdown()
+  self:countdownFinish(true)
+  self:ScheduleRepeatingEvent("shootyepgpBidCountdown",self.countdownCounter,1,self)
+  self:ScheduleEvent("shootyepgpBidCountdownFinish",self.countdownFinish,6,self)
 end
 
 function sepgp_bids:BuildBidsTable()
@@ -145,9 +142,19 @@ function sepgp_bids:OnTooltipUpdate()
   bidcat:AddLine(
       "text", itemName,
       "text2", price,
-      "text3", offspec,
-      "func", "lineTooltip", "arg1", self, "arg2", link, "arg3", this
+      "text3", offspec
     )
+  local countdownHeader = T:AddCategory(
+      "columns", 2,
+      "text","","child_textR",  1, "child_textG",  1, "child_textB",  1,"child_justify", "LEFT",
+      "text2","","child_text2R",  1, "child_text2G",  1, "child_text2B",  1,"child_justify2", "CENTER",
+      "hideBlankLine", true
+    )
+  countdownHeader:AddLine(
+      "text", C:Green("Countdown"), 
+      "text2", self._counterText, 
+      "func", "bidCountdown", "arg1", self
+    )  
   local maincatHeader = T:AddCategory(
       "columns", 1,
       "text", C:Gold("MainSpec Bids")
@@ -193,5 +200,5 @@ function sepgp_bids:OnTooltipUpdate()
       "text4", string.format("%.4g", pr),
       "func", "announceWinnerOS", "arg1", self, "arg2", name, "arg3", pr
     )
-  end  
+  end   
 end
