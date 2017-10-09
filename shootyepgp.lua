@@ -2,6 +2,7 @@ sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2
 sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local BZ = AceLibrary("Babble-Zone-2.2")
+local C = AceLibrary("Crayon-2.0")
 sepgp.VARS = {
   basegp = 135,
   baseaward_ep = 100,
@@ -69,8 +70,10 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
     end
   end 
 
-  if (not sepgp_main) or (sepgp_main == "") then
-    StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
+  if (sepgp_main == nil) or (sepgp_main == "") then
+    if (IsInGuild()) then
+      StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
+    end
   end
 
   if not self:IsEventScheduled("shootyepgpChannelInit") then
@@ -85,6 +88,12 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   self:Hook("SetItemRef")
   -- hook tooltip to add our GP values
   sepgp:TipHook()
+  -- hook LootFrameItem_OnClick to add our own click handlers for bid calls
+  self:SecureHook("LootFrameItem_OnClick")
+  -- hook pfUI loot module :(
+  if pfUI ~= nil and pfUI.loot ~= nil and type(pfUI.loot.UpdateLootFrame) == "function" then
+    self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
+  end
   -- make tablets closable with ESC
   for i=1,4 do
     table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
@@ -132,7 +141,8 @@ function sepgp:TipHook()
   end
   )  -- we leave it in for now so they can check if they were billed the correct GP
   self:SecureHook(GameTooltip, "SetLootItem", function(this, slot)
-    sepgp:AddDataToTooltip(GameTooltip, GetLootSlotLink(slot))
+    local is_master = (sepgp:lootMaster()) and true or nil
+    sepgp:AddDataToTooltip(GameTooltip, GetLootSlotLink(slot), nil, is_master)
   end
   )
   self:SecureHook(GameTooltip, "SetLootRollItem", function(this, id)
@@ -177,7 +187,7 @@ function sepgp:delayedInit()
   end
 end
 
-function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring)
+function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
   local price
   if (itemstring) then
     price = sepgp_prices:GetPrice(itemstring,sepgp_progress)
@@ -185,10 +195,20 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring)
     price = sepgp_prices:GetPrice(itemlink,sepgp_progress)
   end
   if not price then return end
+  local line_limit, left1,right1
+  if (is_master) then 
+    line_limit = 28 
+    left1,right1 = C:Yellow("Alt Click/RClick/MClick"), C:Orange("Call for: MS/OS/Both")
+  else 
+    line_limit = 29 
+  end
   local textRight = string.format("cost:|cff32cd32%d|r offspec:|cff20b2aa%d|r",price,math.floor(price*sepgp_discount))
-  if (tooltip:NumLines() < 29) then
+  if (tooltip:NumLines() < line_limit) then
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
+    if (is_master) then
+      tooltip:AddDoubleLine(left1,right1)
+    end
     tooltip:Show()
   else
     sepgp.extratip:ClearLines()
@@ -197,6 +217,9 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring)
     sepgp.extratip:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", 0, -5)
     sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
     sepgp.extratip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
+    if (is_master) then
+      sepgp.extratip:AddDoubleLine(left1,right1)
+    end
     sepgp.extratip:Show()
   end
 end
@@ -263,6 +286,48 @@ function sepgp:SetItemRef(link, name, button)
         end
         ItemRefTooltip.isDisplayDone = nil
       end
+    end
+  end
+end
+
+function sepgp:LootFrameItem_OnClick(button,data)
+  if not UnitInRaid("player") then return end
+  if not sepgp:lootMaster() then return end
+  local slot, quality
+  if data ~= nil then
+    slot,quality = data:GetID(), data.quality
+  else
+    slot = LootFrame.selectedSlot or 0
+    quality = LootFrame.selectedQuality or -1
+    if not (this._hasExtraClicks) then 
+      this:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
+      this._hasExtraClicks = true
+    end
+  end
+  if LootSlotIsItem(slot) and quality >= 3 then 
+    if (IsAltKeyDown()) then
+      local itemLink = GetLootSlotLink(slot)
+      if (itemLink) then
+        if button == "LeftButton" then
+          SendChatMessage(string.format("Whisper + for %s (mainspec)",itemLink),"RAID")
+        elseif button == "RightButton" then
+          SendChatMessage(string.format("Whisper - for %s (offspec)",itemLink),"RAID")
+        elseif button == "MiddleButton" then
+          SendChatMessage(string.format("Whisper + or - for %s",itemLink),"RAID")
+        end
+      end
+    end
+  end
+end
+
+function sepgp:pfUI_UpdateLootFrame()
+  for slotid, pflootitem in pairs(pfUI.loot.slots) do
+    if not self:IsHooked(pflootitem,"OnClick") then
+      pflootitem:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
+      self:HookScript(pflootitem,"OnClick",function()
+          self:LootFrameItem_OnClick(arg1,this)
+          self.hooks[this]["OnClick"](this,arg1)
+        end)
     end
   end
 end
