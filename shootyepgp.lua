@@ -98,6 +98,7 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   for i=1,4 do
     table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
   end
+  sepgp:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},function() sepgp_standings:Toggle() end)
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
@@ -309,11 +310,14 @@ function sepgp:LootFrameItem_OnClick(button,data)
       local itemLink = GetLootSlotLink(slot)
       if (itemLink) then
         if button == "LeftButton" then
-          SendChatMessage(string.format("Whisper + for %s (mainspec)",itemLink),"RAID")
+          self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
+          --SendChatMessage(string.format("Whisper + for %s (mainspec)",itemLink),"RAID")
         elseif button == "RightButton" then
-          SendChatMessage(string.format("Whisper - for %s (offspec)",itemLink),"RAID")
+          self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
+          --SendChatMessage(string.format("Whisper - for %s (offspec)",itemLink),"RAID")
         elseif button == "MiddleButton" then
-          SendChatMessage(string.format("Whisper + or - for %s",itemLink),"RAID")
+          self:widestAudience(string.format("Whisper + or - for %s",itemLink))
+          --SendChatMessage(string.format("Whisper + or - for %s",itemLink),"RAID")
         end
       end
     end

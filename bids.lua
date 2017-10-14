@@ -70,22 +70,25 @@ function sepgp_bids:Toggle(forceShow)
 end
 
 function sepgp_bids:announceWinnerMS(name, pr)
-  if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr),"RAID")
-  end
+  --if GetNumRaidMembers()>0 then
+  sepgp:widestAudience(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr))
+  --SendChatMessage(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr),"RAID")
+  --end
 end
 
 function sepgp_bids:announceWinnerOS(name, pr)
-  if GetNumRaidMembers()>0 then
-    SendChatMessage(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr),"RAID")
-  end
+  --if GetNumRaidMembers()>0 then
+  sepgp:widestAudience(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr))
+  --SendChatMessage(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr),"RAID")
+  --end
 end
 
 function sepgp_bids:countdownCounter()
   self._counter = (self._counter or 6) - 1
   if GetNumRaidMembers()>0 and self._counter > 0 then
     self._counterText = C:Yellow(tostring(self._counter))
-    SendChatMessage(tostring(self._counter),"RAID")
+    sepgp:widestAudience(tostring(self._counter))
+    --SendChatMessage(tostring(self._counter),"RAID")
     self:Refresh()
   end
 end
