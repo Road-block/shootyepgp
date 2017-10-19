@@ -16,7 +16,8 @@ shootyepgp requires some modifications to guild permissions related to public an
 Creating a new chatframe (right-click > create new window on chat tab) and naming it `debug` (capitalization doesn't matter) will move the bulk of information messages there and out of your default chatframe.
 
 ## usage
-All settings and functions are available from the shootyepgp icon on minimap or FuBar
+All settings and functions are available from the shootyepgp icon on minimap or FuBar.  
+**/shooty** chat command can also be used to toggle the standings window.
 
 ## features
 - EPGP standings list (all)
