@@ -203,7 +203,12 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
   else 
     line_limit = 29 
   end
-  local textRight = string.format("cost:|cff32cd32%d|r offspec:|cff20b2aa%d|r",price,math.floor(price*sepgp_discount))
+  local ep,gp = (sepgp:get_ep_v3(playerName) or 0), (sepgp:get_gp_v3(playerName) or sepgp.VARS.basegp)
+  local off_price = math.floor(price*sepgp_discount)
+  local pr,new_pr,new_pr_off = ep/gp, ep/(gp+price), ep/(gp+off_price)
+  local pr_delta = new_pr - pr
+  local pr_delta_off = new_pr_off - pr
+  local textRight = string.format("cost:|cff32cd32%d|r (|cffff0000%.02f|r |cffff7f00pr|r) offspec:|cff20b2aa%d|r (|cffff0000%.02f|r |cffff7f00pr|r)",price,new_pr,off_price,new_pr_off)
   if (tooltip:NumLines() < line_limit) then
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
