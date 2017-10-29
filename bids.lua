@@ -40,7 +40,7 @@ end
 
 function sepgp_bids:setHideScript()
   local detachedFrame, tablet
-  for i=1,4 do
+  for i=1,5 do
     tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
     if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_bids" then
       if not (tablet:GetScript("OnHide")) then

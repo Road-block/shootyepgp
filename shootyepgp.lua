@@ -3,13 +3,24 @@ sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local BZ = AceLibrary("Babble-Zone-2.2")
 local C = AceLibrary("Crayon-2.0")
+local BC = AceLibrary("Babble-Class-2.2")
+local DF = AceLibrary("Deformat-2.0")
+local G = AceLibrary("Gratuity-2.0")
 sepgp.VARS = {
   basegp = 135,
   baseaward_ep = 100,
   decay = 0.85,
   max = 5000,
   timeout = 45,
-  maxloglines = 500
+  maxloglines = 500,
+  prefix = "SEPGP_PREFIX",
+  bop = C:Red("BoP"),
+  boe = C:Yellow("BoE"),
+  nobid = C:White("NoBind"),
+  msgp = "Mainspec GP",
+  osgp = "Offspec GP",
+  bankde = "Bank-D/E",
+  reminder = C:Red("Unassigned")
 }
 local playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
@@ -39,14 +50,14 @@ do
     hexColorQuality[ITEM_QUALITY_COLORS[i].hex] = i
   end
 end
-
+-- TODO:
+-- 2. Implement an Import facility to mirror Export.
 sepgp.reserves = {}
+sepgp.bids_main,sepgp.bids_off,sepgp.bid_item = {},{},{}
 sepgp.timer = CreateFrame("Frame")
 sepgp.timer.cd_text = ""
 sepgp.timer:Hide()
 sepgp.timer:SetScript("OnUpdate",function() sepgp.OnUpdate(this,arg1) end)
-
-sepgp.bids_main,sepgp.bids_off,sepgp.bid_item = {},{},{}
 
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_saychannel == nil then sepgp_saychannel = "GUILD" end
@@ -54,6 +65,7 @@ function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_progress == nil then sepgp_progress = "T1" end
   if sepgp_discount == nil then sepgp_discount = 0.25 end
   if sepgp_log == nil then sepgp_log = {} end
+  if sepgp_looted == nil then sepgp_looted = {} end
   sepgp.extratip = CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
 end
 
@@ -87,36 +99,42 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   -- hook SetItemRef to parse our client bid links
   self:Hook("SetItemRef")
   -- hook tooltip to add our GP values
-  sepgp:TipHook()
+  self:TipHook()
   -- hook LootFrameItem_OnClick to add our own click handlers for bid calls
   self:SecureHook("LootFrameItem_OnClick")
+  -- hook ContainerFrameItemButton_OnClick to add our own click handlers for bid calls
+  self:Hook("ContainerFrameItemButton_OnClick")
   -- hook pfUI loot module :(
   if pfUI ~= nil and pfUI.loot ~= nil and type(pfUI.loot.UpdateLootFrame) == "function" then
     self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
   end
   -- make tablets closable with ESC
-  for i=1,4 do
+  for i=1,5 do
     table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
   end
-  sepgp:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},function() sepgp_standings:Toggle() end)
+  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},function() sepgp_standings:Toggle() end)
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
-  sepgp:RegisterEvent("GUILD_ROSTER_UPDATE",function() 
+  self:RegisterEvent("GUILD_ROSTER_UPDATE",function() 
       if (arg1) then -- member join /leave
         self:SetRefresh(true)
       end
     end)
-  sepgp:RegisterEvent("RAID_ROSTER_UPDATE",function()
+  self:RegisterEvent("RAID_ROSTER_UPDATE",function()
       self:SetRefresh(true)
     end)
-  sepgp:RegisterEvent("PARTY_MEMBERS_CHANGED",function()
+  self:RegisterEvent("PARTY_MEMBERS_CHANGED",function()
       self:SetRefresh(true)
     end)
-  sepgp:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
-  sepgp:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
-  sepgp:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
-  sepgp:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
+  self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
+  self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
+  self:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
+  self:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
+  self:RegisterEvent("CHAT_MSG_ADDON","addonComms")
+  self:RegisterEvent("CHAT_MSG_LOOT","captureLoot")
+  self:RegisterEvent("TRADE_PLAYER_ITEM_CHANGED","tradeLoot")
+  self:RegisterEvent("TRADE_ACCEPT_UPDATE","tradeLoot")
 
   if (IsInGuild()) then
     if (GetNumGuildMembers()==0) then
@@ -138,9 +156,19 @@ end
 
 function sepgp:TipHook()
   self:SecureHook(GameTooltip, "SetBagItem", function(this, bag, slot)
-    sepgp:AddDataToTooltip(GameTooltip, GetContainerItemLink(bag, slot))
+    local itemLink = GetContainerItemLink(bag, slot)
+    local ml_tip
+    if (itemLink) then
+      local is_master = (sepgp:lootMaster()) and true or nil
+      local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
+      if (link_found) then
+        local bind = self:itemBinding(itemString) or ""
+        ml_tip = is_master and bind == sepgp.VARS.boe
+      end
+    end
+    sepgp:AddDataToTooltip(GameTooltip, itemLink, nil, ml_tip)
   end
-  )  -- we leave it in for now so they can check if they were billed the correct GP
+  )
   self:SecureHook(GameTooltip, "SetLootItem", function(this, slot)
     local is_master = (sepgp:lootMaster()) and true or nil
     sepgp:AddDataToTooltip(GameTooltip, GetLootSlotLink(slot), nil, is_master)
@@ -172,7 +200,7 @@ function sepgp:delayedInit()
   if sepgp_reservechannel == nil then sepgp_reservechannel = shooty_reservechan end  
   local reservesChannelID = tonumber((GetChannelName(sepgp_reservechannel)))
   if (reservesChannelID) and (reservesChannelID ~= 0) then
-    sepgp:reservesToggle(true)
+    self:reservesToggle(true)
   end
   -- migrate EPGP storage if needed
   local _,_,major_ver = string.find((GetAddOnMetadata("shootyepgp","Version")),"^(%d+)%.[%d%.%-]+$")
@@ -203,12 +231,12 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
   else 
     line_limit = 29 
   end
-  local ep,gp = (sepgp:get_ep_v3(playerName) or 0), (sepgp:get_gp_v3(playerName) or sepgp.VARS.basegp)
+  local ep,gp = (self:get_ep_v3(playerName) or 0), (self:get_gp_v3(playerName) or sepgp.VARS.basegp)
   local off_price = math.floor(price*sepgp_discount)
   local pr,new_pr,new_pr_off = ep/gp, ep/(gp+price), ep/(gp+off_price)
   local pr_delta = new_pr - pr
   local pr_delta_off = new_pr_off - pr
-  local textRight = string.format("cost:|cff32cd32%d|r (|cffff0000%.02f|r |cffff7f00pr|r) offspec:|cff20b2aa%d|r (|cffff0000%.02f|r |cffff7f00pr|r)",price,new_pr,off_price,new_pr_off)
+  local textRight = string.format("gp:|cff32cd32%d|r(|cffff0000%.02f|r|cffff7f00pr|r) os:|cff20b2aa%d|r(|cffff0000%.02f|r|cffff7f00pr|r)",price,new_pr,off_price,new_pr_off)
   if (tooltip:NumLines() < line_limit) then
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
@@ -221,8 +249,9 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
     sepgp.extratip:SetOwner(tooltip,"ANCHOR_NONE")
     sepgp.extratip:ClearAllPoints()
     sepgp.extratip:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", 0, -5)
-    sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
-    sepgp.extratip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
+    --sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
+    sepgp.extratip:SetText("|cff9664c8shootyepgp|r")
+    sepgp.extratip:AddLine(textRight)
     if (is_master) then
       sepgp.extratip:AddDoubleLine(left1,right1)
     end
@@ -275,7 +304,7 @@ function sepgp:SetItemRef(link, name, button)
     else
       bid = nil
     end
-    if not sepgp:inRaid(masterlooter) then
+    if not self:inRaid(masterlooter) then
       masterlooter = nil
     end
     if (bid and masterlooter) then
@@ -288,7 +317,7 @@ function sepgp:SetItemRef(link, name, button)
     if (strsub(link, 1, 4) == "item") then
       if (ItemRefTooltip:IsVisible()) then
         if (not DressUpFrame:IsVisible()) then
-          sepgp:AddDataToTooltip(ItemRefTooltip, link)
+          self:AddDataToTooltip(ItemRefTooltip, link)
         end
         ItemRefTooltip.isDisplayDone = nil
       end
@@ -297,8 +326,9 @@ function sepgp:SetItemRef(link, name, button)
 end
 
 function sepgp:LootFrameItem_OnClick(button,data)
+  if not IsAltKeyDown() then return end
   if not UnitInRaid("player") then return end
-  if not sepgp:lootMaster() then return end
+  if not self:lootMaster() then return end
   local slot, quality
   if data ~= nil then
     slot,quality = data:GetID(), data.quality
@@ -311,22 +341,54 @@ function sepgp:LootFrameItem_OnClick(button,data)
     end
   end
   if LootSlotIsItem(slot) and quality >= 3 then 
-    if (IsAltKeyDown()) then
-      local itemLink = GetLootSlotLink(slot)
-      if (itemLink) then
-        if button == "LeftButton" then
-          self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
-          --SendChatMessage(string.format("Whisper + for %s (mainspec)",itemLink),"RAID")
-        elseif button == "RightButton" then
-          self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
-          --SendChatMessage(string.format("Whisper - for %s (offspec)",itemLink),"RAID")
-        elseif button == "MiddleButton" then
-          self:widestAudience(string.format("Whisper + or - for %s",itemLink))
-          --SendChatMessage(string.format("Whisper + or - for %s",itemLink),"RAID")
-        end
+    local itemLink = GetLootSlotLink(slot)
+    if (itemLink) then
+      if button == "LeftButton" then
+        self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
+      elseif button == "RightButton" then
+        self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
+      elseif button == "MiddleButton" then
+        self:widestAudience(string.format("Whisper + or - for %s",itemLink))
       end
     end
   end
+end
+
+function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
+  if not IsAltKeyDown() then 
+    return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
+  end
+  if not UnitInRaid("player") then 
+    return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
+  end
+  if not self:lootMaster() then 
+    return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
+  end
+  if not (this._hasExtraClicks) then
+    this:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
+    this._hasExtraClicks = true
+  end
+  local bag,slot = this:GetParent():GetID(), this:GetID()
+  local itemLink = GetContainerItemLink(bag, slot)
+  if (itemLink) then
+    local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
+    if (link_found) then
+      local bind = self:itemBinding(itemString) or ""
+      if (bind == self.VARS.boe) then
+        if button == "LeftButton" then
+          self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
+          return
+        elseif button == "RightButton" then
+          self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
+          return
+        elseif button == "MiddleButton" then
+          self:widestAudience(string.format("Whisper + or - for %s",itemLink))
+          return
+        end    
+      end      
+    end
+  end
+  return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
 end
 
 function sepgp:pfUI_UpdateLootFrame()
@@ -356,9 +418,9 @@ end
 function sepgp:debugPrint(msg)
   if (shooty_debugchat) then
     shooty_debugchat:AddMessage(string.format(out,msg))
-    sepgp:flashFrame(shooty_debugchat)
+    self:flashFrame(shooty_debugchat)
   else
-    sepgp:defaultPrint(msg)
+    self:defaultPrint(msg)
   end
 end
 
@@ -429,6 +491,45 @@ function sepgp:widestAudience(msg)
   SendChatMessage(msg, channel)
 end
 
+function sepgp:addonMessage(message,channel,sender)
+  SendAddonMessage(self.VARS.prefix,message,channel,sender)
+end
+
+function sepgp:addonComms(prefix,message,channel,sender)
+  if not prefix == self.VARS.prefix then return end -- we don't care for messages from other addons
+  if sender == playerName then return end -- we don't care for messages from ourselves
+  if not self:verifyGuildMember(sender,true) then return end -- only accept messages from guild members
+  local who,what,amount
+  for name,epgp,change in string.gfind(message,"([^;]+);([^;]+);([^;]+)") do
+    who=name
+    what=epgp
+    amount=tonumber(change)
+  end
+  if (who) and (what) and (amount) then
+    local msg
+    if who == playerName then
+      if what == "EP" then
+        if amount < 0 then
+          msg = string.format("You have received a %d EP penalty.",amount)
+        else
+          msg = string.format("You have been awarded %d EP.",amount)
+        end
+      elseif what == "GP" then
+        msg = string.format("You have gained %d GP.",amount)
+      end
+    elseif who == "ALL" and what == "DECAY" then
+      msg = string.format("%s%% decay to EP and GP.",amount)
+    elseif who == "RAID" and what == "AWARD" then
+      msg = string.format("%d EP awarded to Raid.",amount)
+    end
+    if msg and msg~="" then
+      self:defaultPrint(msg)
+      local report = self:my_epgp()
+      self:defaultPrint(report)
+    end
+  end
+end
+
 ---------------------
 -- EPGP Operations
 ---------------------
@@ -455,7 +556,7 @@ function sepgp:init_notes_v3(guild_index,name,officernote)
   return officernote
 end
 
-function sepgp:update_epgp_v3(ep,gp,guild_index,name,officernote)
+function sepgp:update_epgp_v3(ep,gp,guild_index,name,officernote,special_action)
   officernote = self:init_notes_v3(guild_index,name,officernote)
   local newnote
   if (ep) then
@@ -485,7 +586,7 @@ function sepgp:update_ep_v2(getname,ep)
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
     if (name==getname) then 
-      sepgp:init_notes_v2(i,note,officernote)
+      self:init_notes_v2(i,note,officernote)
       GuildRosterSetPublicNote(i,ep)
     end
   end
@@ -504,7 +605,7 @@ function sepgp:update_gp_v2(getname,gp)
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
     if (name==getname) then 
-      sepgp:init_notes_v2(i,note,officernote)
+      self:init_notes_v2(i,note,officernote)
       GuildRosterSetOfficerNote(i,gp,true) 
     end
   end
@@ -571,22 +672,27 @@ end
 
 function sepgp:award_raid_ep(ep) -- awards ep to raid members in zone
   if GetNumRaidMembers()>0 then
-    sepgp:simpleSay(string.format("Giving %d ep to all raidmembers",ep))
-    self:addToLog(string.format("Giving %d ep to all raidmembers",ep))
     for i = 1, GetNumRaidMembers(true) do
       local name, rank, subgroup, level, class, fileName, zone, online, isDead = GetRaidRosterInfo(i)
-      sepgp:givename_ep(name,ep)
+      self:givename_ep(name,ep)
     end
+    self:simpleSay(string.format("Giving %d ep to all raidmembers",ep))
+    self:addToLog(string.format("Giving %d ep to all raidmembers",ep))    
+    local addonMsg = string.format("RAID;AWARD;%s",ep)
+    self:addonMessage(addonMsg,"RAID")
   else UIErrorsFrame:AddMessage("You aren't in a raid dummy",1,0,0)end
 end
 
 function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
-  if table.getn(sepgp.shooty_reserves) > 0 then
-    sepgp:simpleSay(string.format("Giving %d ep to active reserves",ep))
-    self:addToLog(string.format("Giving %d ep to active reserves",ep))
-    for i, name in ipairs(sepgp.shooty_reserves) do
-      sepgp:givename_ep(name,ep)
+  if table.getn(sepgp.reserves) > 0 then
+    for i, reserve in ipairs(sepgp.reserves) do
+      local name, class, rank, alt = unpack(reserve[i])
+      self:givename_ep(name,ep)
     end
+    self:simpleSay(string.format("Giving %d ep to active reserves",ep))
+    self:addToLog(string.format("Giving %d ep to active reserves",ep))
+    local addonMsg = string.format("RESERVES;AWARD;%s",ep)
+    self:addonMessage(addonMsg,"GUILD")
     sepgp.reserves = {}
     reserves_blacklist = {}
   end
@@ -594,25 +700,29 @@ end
 
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
   if not (admin()) then return end
-  sepgp:debugPrint(string.format("Giving %d ep to %s",ep,getname))
-  if ep < 0 then -- inform admins of penalties
+  local newep = ep + (self:get_ep_v3(getname) or 0) --DONE: update v3
+  self:update_ep_v3(getname,newep) --DONE: update v3
+  self:debugPrint(string.format("Giving %d ep to %s",ep,getname))
+  if ep < 0 then -- inform admins and victim of penalties
     local msg = string.format("%s EP Penalty to %s.",ep,getname)
-    sepgp:adminSay(msg)
+    self:adminSay(msg)
     self:addToLog(msg)
-  end
-  ep = ep + (sepgp:get_ep_v3(getname) or 0) --DONE: update v3
-  sepgp:update_ep_v3(getname,ep) --DONE: update v3
+    local addonMsg = string.format("%s;%s;%s",getname,"EP",ep)
+    self:addonMessage(addonMsg,"GUILD")
+  end  
 end
 
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
   if not (admin()) then return end
-  sepgp:debugPrint(string.format("Giving %d gp to %s",gp,getname))
-  local oldgp = (sepgp:get_gp_v3(getname) or sepgp.VARS.basegp) --DONE: update v3
+  local oldgp = (self:get_gp_v3(getname) or sepgp.VARS.basegp) --DONE: update v3
   local newgp = gp + oldgp
+  self:update_gp_v3(getname,newgp) --DONE: update v3
+  self:debugPrint(string.format("Giving %d gp to %s",gp,getname))
   local msg = string.format("Awarding %d GP to %s. (Previous: %d, New: %d)",gp,getname,oldgp,math.max(sepgp.VARS.basegp,newgp))
-  sepgp:adminSay(msg)
+  self:adminSay(msg)
   self:addToLog(msg)
-  sepgp:update_gp_v3(getname,newgp) --DONE: update v3
+  local addonMsg = string.format("%s;%s;%s",getname,"GP",gp)
+  self:addonMessage(addonMsg,"GUILD")  
 end
 
 function sepgp:decay_epgp_v2() -- decays entire roster's ep and gp
@@ -628,16 +738,16 @@ function sepgp:decay_epgp_v2() -- decays entire roster's ep and gp
         self:debugPrint(msg)
         self:adminSay(msg)
       else
-        ep = math.max(0,sepgp:num_round(ep*sepgp_decay))
+        ep = math.max(0,self:num_round(ep*sepgp_decay))
     	  GuildRosterSetPublicNote(i,ep)
-    	  gp = math.max(sepgp.VARS.basegp,sepgp:num_round(gp*sepgp_decay))
+    	  gp = math.max(sepgp.VARS.basegp,self:num_round(gp*sepgp_decay))
     	  GuildRosterSetOfficerNote(i,gp,true)
       end
     end
   end
   local msg = string.format("All EP and GP decayed by %d%%",(1-sepgp_decay)*100)
-  sepgp:simpleSay(msg)
-  if not (sepgp_saychannel=="OFFICER") then sepgp:adminSay(msg) end
+  self:simpleSay(msg)
+  if not (sepgp_saychannel=="OFFICER") then self:adminSay(msg) end
   self:addToLog(msg)
 end
 
@@ -647,14 +757,16 @@ function sepgp:decay_epgp_v3()
     local name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
     local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
     if (ep and gp) then
-      ep = sepgp:num_round(ep*sepgp_decay)
-      gp = sepgp:num_round(gp*sepgp_decay)
-      sepgp:update_epgp_v3(ep,gp,i,name,officernote)
+      ep = self:num_round(ep*sepgp_decay)
+      gp = self:num_round(gp*sepgp_decay)
+      self:update_epgp_v3(ep,gp,i,name,officernote)
     end
   end
   local msg = string.format("All EP and GP decayed by %s%%",(1-sepgp_decay)*100)
-  sepgp:simpleSay(msg)
-  if not (sepgp_saychannel=="OFFICER") then sepgp:adminSay(msg) end
+  self:simpleSay(msg)
+  if not (sepgp_saychannel=="OFFICER") then self:adminSay(msg) end
+  local addonMsg = string.format("ALL;DECAY;%s",(1-(sepgp_decay or sepgp.VARS.decay))*100)
+  self:addonMessage(addonMsg,"GUILD")
   self:addToLog(msg)  
 end
 
@@ -663,7 +775,7 @@ function sepgp:gp_reset_v2()
     for i = 1, GetNumGuildMembers(1) do
       GuildRosterSetOfficerNote(i, sepgp.VARS.basegp,true)
     end
-    sepgp:debugPrint(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
+    self:debugPrint(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
     self:adminSay(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
     self:addToLog(string.format("All GP has been reset to %d.",sepgp.VARS.basegp))
   end
@@ -675,14 +787,21 @@ function sepgp:gp_reset_v3()
       local name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
       local ep,gp = self:get_ep_v3(name,officernote), self:get_gp_v3(name,officernote)
       if (ep and gp) then
-        sepgp:update_epgp_v3(0,sepgp.VARS.basegp,i,name,officernote)
+        self:update_epgp_v3(0,sepgp.VARS.basegp,i,name,officernote)
       end
     end
     local msg = "All EP and GP has been reset to 0/%d."
-    sepgp:debugPrint(string.format(msg,sepgp.VARS.basegp))
+    self:debugPrint(string.format(msg,sepgp.VARS.basegp))
     self:adminSay(string.format(msg,sepgp.VARS.basegp))
     self:addToLog(string.format(msg,sepgp.VARS.basegp))
   end
+end
+
+function sepgp:my_epgp()
+  local ep,gp = (self:get_ep_v3(playerName) or 0), (self:get_gp_v3(playerName) or sepgp.VARS.basegp)
+  local pr = ep/gp
+  local msg = string.format("You now have: %d EP %d GP |cffffff00%.03f|r|cffff7f00PR|r.", ep,gp,pr)
+  return msg
 end
 
 ---------
@@ -698,7 +817,7 @@ sepgp.hasIcon = "Interface\\Icons\\INV_Misc_Orb_04"
 function sepgp:OnTooltipUpdate()
   local hint = "|cffffff00Click|r to toggle Standings.%s \n|cffffff00Right-Click|r for Options."
   if (admin()) then
-    hint = string.format(hint," \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Shift+Click|r to toggle Logs.")
+    hint = string.format(hint," \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Shift+Click|r to toggle Loot. \n|cffffff00Ctrl+Shift+Click|r to toggle Logs.")
   else
     hint = string.format(hint,"")
   end
@@ -712,6 +831,8 @@ function sepgp:OnClick()
   elseif (IsAltKeyDown() and is_admin) then
     sepgp_bids:Toggle()
   elseif (IsShiftKeyDown() and is_admin) then
+    sepgp_loot:Toggle()
+  elseif (IsShiftKeyDown() and IsControlKeyDown() and is_admin) then
     sepgp_logs:Toggle()
   else
     sepgp_standings:Toggle()
@@ -960,22 +1081,22 @@ function sepgp:reservesToggle(flag)
     if (reservesChannelID) and reservesChannelID ~= 0 then
       sepgp.reservesChannelID = reservesChannelID
       if not self:IsEventRegistered("CHAT_MSG_CHANNEL") then
-        sepgp:RegisterEvent("CHAT_MSG_CHANNEL","captureReserveChatter")
+        self:RegisterEvent("CHAT_MSG_CHANNEL","captureReserveChatter")
       end
       return true
     else
-      sepgp:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE","reservesChannelChange")
+      self:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE","reservesChannelChange")
       JoinChannelByName(sepgp_reservechannel)
       return
     end
   else -- we want out
     if (reservesChannelID) and reservesChannelID ~= 0 then
-      sepgp:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE","reservesChannelChange")
+      self:RegisterEvent("CHAT_MSG_CHANNEL_NOTICE","reservesChannelChange")
       LeaveChannelByName(sepgp_reservechannel)
       return
     else
-      if sepgp:IsEventRegistered("CHAT_MSG_CHANNEL") then
-        sepgp:UnregisterEvent("CHAT_MSG_CHANNEL")
+      if self:IsEventRegistered("CHAT_MSG_CHANNEL") then
+        self:UnregisterEvent("CHAT_MSG_CHANNEL")
       end      
       return false
     end
@@ -987,14 +1108,14 @@ function sepgp:reservesChannelChange(msg,_,_,_,_,_,_,_,channel)
     if msg == "YOU_JOINED" then
       sepgp.reservesChannelID = tonumber((GetChannelName(sepgp_reservechannel)))
       RemoveChatWindowChannel(DEFAULT_CHAT_FRAME:GetID(), sepgp_reservechannel)
-      sepgp:RegisterEvent("CHAT_MSG_CHANNEL","captureReserveChatter")
+      self:RegisterEvent("CHAT_MSG_CHANNEL","captureReserveChatter")
     elseif msg == "YOU_LEFT" then
       sepgp.reservesChannelID = nil 
-      if sepgp:IsEventRegistered("CHAT_MSG_CHANNEL") then
-        sepgp:UnregisterEvent("CHAT_MSG_CHANNEL")
+      if self:IsEventRegistered("CHAT_MSG_CHANNEL") then
+        self:UnregisterEvent("CHAT_MSG_CHANNEL")
       end
     end
-    sepgp:UnregisterEvent("CHAT_MSG_CHANNEL_NOTICE")
+    self:UnregisterEvent("CHAT_MSG_CHANNEL_NOTICE")
     D:Close()
   end
 end
@@ -1031,15 +1152,15 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
   if (r) and (running_check) then
     if (rdy) then
       if (name) and (name ~= "") then
-        if (not sepgp:inRaid(name)) then
-          reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(name)
+        if (not self:inRaid(name)) then
+          reserve, reserve_class, reserve_rank = self:verifyGuildMember(name)
           if reserve ~= sender then
             reserve_alt = sender
           end
         end
       else
-        if (not sepgp:inRaid(sender)) then
-          reserve, reserve_class, reserve_rank = sepgp:verifyGuildMember(sender)    
+        if (not self:inRaid(sender)) then
+          reserve, reserve_class, reserve_rank = self:verifyGuildMember(sender)    
         end
       end
       if reserve and reserve_class and reserve_rank then
@@ -1048,14 +1169,14 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
             reserves_blacklist[reserve_alt] = true
             table.insert(sepgp.reserves,{reserve,reserve_class,reserve_rank,reserve_alt})
           else
-            sepgp:defaultPrint(string.format("|cffff0000%s|r trying to add %s to Reserves, but has already added a member. Discarding!",reserve_alt,reserve))
+            self:defaultPrint(string.format("|cffff0000%s|r trying to add %s to Reserves, but has already added a member. Discarding!",reserve_alt,reserve))
           end
         else
           if not reserves_blacklist[reserve] then
             reserves_blacklist[reserve] = true
             table.insert(sepgp.reserves,{reserve,reserve_class,reserve_rank})
           else
-            sepgp:defaultPrint(string.format("|cffff0000%s|r has already been added to Reserves. Discarding!",reserve))
+            self:defaultPrint(string.format("|cffff0000%s|r has already been added to Reserves. Discarding!",reserve))
           end
         end
       end
@@ -1064,7 +1185,7 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
   end
   local q = string.find(text,"^{shootyepgp}Type")
   if (q) and not (running_check) then
-    if (not UnitInRaid("player")) or (not sepgp:inRaid(sender)) then
+    if (not UnitInRaid("player")) or (not self:inRaid(sender)) then
       StaticPopup_Show("SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE")
     end
   end
@@ -1133,7 +1254,7 @@ function sepgp:captureLootCall(text, sender)
           self:debugPrint("Capturing Bids for 5min.")
           sepgp_bids:Toggle(true)
         end
-        sepgp:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
+        self:bidPrint(itemLink,sender,mskw_found,oskw_found,whisperkw_found)
       end
     end
   end
@@ -1182,7 +1303,7 @@ end
 
 function sepgp:clearBids(reset)
   if reset~=nil then
-    sepgp:debugPrint("Clearing old Bids")
+    self:debugPrint("Clearing old Bids")
   end
   sepgp.bid_item = {}
   sepgp.bids_main = {}
@@ -1196,10 +1317,150 @@ function sepgp:clearBids(reset)
   sepgp_bids:Refresh()
 end
 
+----------------
+-- Loot Tracker
+----------------
+-- test: "You receive loot: \124cffa335ee\124Hitem:16866:0:0:0\124h[Helm of Might]\124h\124r."
+-- test: "Raerlas receives loot: \124cffa335ee\124Hitem:16846:0:0:0\124h[Giantstalker's Helmet]\124h\124r."
+sepgp.loot_index = {
+  time=1,
+  player=2,
+  player_c=3,
+  item=4,
+  bind=5,
+  price=6,
+  off_price=7,
+  action=8,
+  update=9
+}
+function sepgp:captureLoot(message)
+  if not (UnitInRaid("player") and self:lootMaster()) then return end
+  local who,what,amount,player,itemLink
+  who,what,amount = DF:Deformat(message,LOOT_ITEM_MULTIPLE)
+  if (amount) then -- skip multiples / stacks
+  else
+    player, itemLink = DF:Deformat(message,LOOT_ITEM)
+  end
+  who,what,amount = YOU, DF:Deformat(message,LOOT_ITEM_SELF_MULTIPLE)
+  if (amount) then -- skip multiples / stacks
+  else
+    if not (player and itemLink) then
+      player, itemLink = YOU, DF:Deformat(message,LOOT_ITEM_SELF)
+    end
+  end
+  if not (player and itemLink) then return end
+  local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
+  if player and itemLink and link_found then 
+    local bind = self:itemBinding(itemString)
+    if not (bind) then return end
+    local price = sepgp_prices:GetPrice(itemString,sepgp_progress)
+    if not (price) or price == 0 then
+      return
+    end
+    local class,_
+    if player == YOU then 
+      class = UnitClass("player") -- localized 
+    else
+      _, class = self:verifyGuildMember(player,true) -- localized
+    end
+    if not (class) then return end
+    local player_color = C:Colorize(BC:GetHexColor(class),player)
+    local off_price = math.floor(price*sepgp_discount)
+    local quality = hexColorQuality[itemColor] or -1
+    local timestamp = date("%b/%d %H:%M:%S")
+    local data = {[self.loot_index.time]=timestamp,[self.loot_index.player]=player,[self.loot_index.player_c]=player_color,[self.loot_index.item]=itemLink,[self.loot_index.bind]=bind,[self.loot_index.price]=price,[self.loot_index.off_price]=off_price}
+    local dialog = StaticPopup_Show("SHOOTY_EPGP_AUTO_GEARPOINTS",data[self.loot_index.player_c],data[self.loot_index.item],data)
+    if (dialog) then
+      dialog.data = data
+    end
+  end
+end
+
+function sepgp:findLootReminder(itemLink)
+  for i,data in ipairs(sepgp_looted) do
+    if data[self.loot_index.item] == itemLink --[[and data[self.loot_index.action] == self.VARS.reminder]] then
+      return data
+    end
+  end
+end
+
+function sepgp:tradeLoot(playerState,targetState)
+  if not (UnitInRaid("player") and self:lootMaster()) then return end
+  if (playerState ~= nil and targetState ~= nil) and playerState == 1 and targetState == 1 then
+    local itemLink
+    for id=1,MAX_TRADABLE_ITEMS do
+      itemLink = GetTradePlayerItemLink(id)
+      if (itemLink) then
+        break  
+      end
+    end
+    if (itemLink) then
+      local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
+      if (link_found) then
+        local price = sepgp_prices:GetPrice(itemString,sepgp_progress)
+        if not (price) or price == 0 then
+          return
+        end
+        local bind = self:itemBinding(itemString)
+        if (not bind) or (bind ~= self.VARS.boe) then return end
+        if UnitExists("target") and UnitIsPlayer("target") and UnitCanCooperate("target") and (not UnitIsUnit("player","target")) then
+          local tradeTarget = UnitName("target")
+          local _, class = self:verifyGuildMember(tradeTarget,true)
+          if not (class) then return end
+          local target_color = C:Colorize(BC:GetHexColor(class),tradeTarget)
+          local timestamp = date("%b/%d %H:%M:%S")
+          local data = self:findLootReminder(itemLink) -- verify that it updates the data in the referenced table and not creating a copy
+          if (data) then
+            data[self.loot_index.time] = timestamp
+            data[self.loot_index.player] = tradeTarget
+            data[self.loot_index.player_c] = target_color
+            data[self.loot_index.update] = 1
+            local dialog = StaticPopup_Show("SHOOTY_EPGP_AUTO_GEARPOINTS",data[self.loot_index.player_c],data[self.loot_index.item],data)
+            if (dialog) then
+              dialog.data = data
+            end
+          end
+        end
+      end
+    end
+  end
+end
+
+sepgp.item_bind_patterns = {
+  CRAFT = "("..ITEM_SPELL_TRIGGER_ONUSE..")",
+  BOP = "("..ITEM_BIND_ON_PICKUP..")",
+  QUEST = "("..ITEM_BIND_QUEST..")",
+  BOU = "("..ITEM_BIND_ON_EQUIP..")",
+  BOE = "("..ITEM_BIND_ON_USE..")"
+}
+function sepgp:itemBinding(item)
+  G:SetHyperlink(item)
+  if G:Find(self.item_bind_patterns.CRAFT,2,4,nil,true) then
+  else
+    if G:Find(self.item_bind_patterns.BOP,2,4,nil,true) then
+      return sepgp.VARS.bop
+    elseif G:Find(self.item_bind_patterns.QUEST,2,4,nil,true) then
+      return sepgp.VARS.bop
+    elseif G:Find(self.item_bind_patterns.BOE,2,4,nil,true) then
+      return sepgp.VARS.boe
+    elseif G:Find(self.item_bind_patterns.BOU,2,4,nil,true) then
+      return sepgp.VARS.boe
+    else
+      return sepgp.VARS.nobind
+    end
+  end
+  return
+end
+
+function sepgp:addOrUpdateLoot(data,update)
+  if not (update) then
+    table.insert(sepgp_looted,data)
+  end
+end
+
 ------------
 -- Logging
 ------------
-
 function sepgp:addToLog(line,skipTime)
   local over = table.getn(sepgp_log)-sepgp.VARS.maxloglines+1
   if over > 0 then
@@ -1223,15 +1484,15 @@ function sepgp:num_round(i)
   return math.floor(i+0.5)
 end
 
-function sepgp:verifyGuildMember(name)
+function sepgp:verifyGuildMember(name,silent)
   for i=1,GetNumGuildMembers(1) do
     local g_name, g_rank, g_rankIndex, g_level, g_class, g_zone, g_note, g_officernote, g_online = GetGuildRosterInfo(i)
     if (string.lower(name) == string.lower(g_name)) and (tonumber(g_level) == MAX_PLAYER_LEVEL) then
       return g_name, g_class, g_rank
     end
   end
-  if (name) and name ~= "" then
-    sepgp:defaultPrint(string.format("%s not found in the guild or not max level!",name))
+  if (name) and name ~= "" and not (silent) then
+    self:defaultPrint(string.format("%s not found in the guild or not max level!",name))
   end
   return
 end
@@ -1304,6 +1565,7 @@ end
 -------------
 -- Dialogs
 -------------
+
 StaticPopupDialogs["SHOOTY_EPGP_SET_MAIN"] = {
   text = "Set your main to be able to participate in Reserve List EPGP Checks.",
   button1 = TEXT(ACCEPT),
@@ -1362,4 +1624,92 @@ StaticPopupDialogs["SHOOTY_EPGP_CONFIRM_RESET"] = {
   exclusive = 1,
   showAlert = 1,
   hideOnEscape = 1
-};
+}
+
+local sepgp_auto_gp_menu = {
+  --{text = "Choose an Action", isTitle = true},
+  {text = "Add MainSpec GP", func = function()
+    local dialog = StaticPopup_FindVisible("SHOOTY_EPGP_AUTO_GEARPOINTS")
+    if (dialog) then
+      local data = dialog.data
+      local player, price = data[sepgp.loot_index.player], data[sepgp.loot_index.price]
+      sepgp:givename_gp((player==YOU and playerName or player),price)
+      data[sepgp.loot_index.action] = sepgp.VARS.msgp
+      local update = data[sepgp.loot_index.update] ~= nil
+      sepgp:addOrUpdateLoot(data,update)
+      StaticPopup_Hide("SHOOTY_EPGP_AUTO_GEARPOINTS")
+      sepgp_loot:Refresh()
+    end
+  end},
+  {text = "Add OffSpec GP", func = function()
+    local dialog = StaticPopup_FindVisible("SHOOTY_EPGP_AUTO_GEARPOINTS")
+    if (dialog) then
+      local data = dialog.data
+      local player, off_price = data[sepgp.loot_index.player], data[sepgp.loot_index.off_price]
+      sepgp:givename_gp((player==YOU and playerName or player),off_price)
+      data[sepgp.loot_index.action] = sepgp.VARS.osgp
+      local update = data[sepgp.loot_index.update] ~= nil
+      sepgp:addOrUpdateLoot(data,update)
+      StaticPopup_Hide("SHOOTY_EPGP_AUTO_GEARPOINTS")
+      sepgp_loot:Refresh()
+    end
+  end},
+  {text = "Bank or D/E", func = function()
+    local dialog = StaticPopup_FindVisible("SHOOTY_EPGP_AUTO_GEARPOINTS")
+    if (dialog) then
+      local data = dialog.data
+      data[sepgp.loot_index.action] = sepgp.VARS.bankde
+      local update = data[sepgp.loot_index.update] ~= nil
+      sepgp:addOrUpdateLoot(data,update)
+      StaticPopup_Hide("SHOOTY_EPGP_AUTO_GEARPOINTS")
+      sepgp_loot:Refresh()
+    end
+  end}
+}
+StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
+  text = "%s looted %s. What do you want to do?",
+  button1 = "GP Actions",
+  button2 = "Remind me Later",
+  OnAccept = function()
+    sepgp:EasyMenu(sepgp_auto_gp_menu, this:GetParent().menuFrame, this, 0, 0, "MENU")
+    return true
+  end,
+  OnCancel = function(data,reason)
+    if reason == "override" or reason == "clicked" then
+      data[sepgp.loot_index.action] = sepgp.VARS.reminder
+      local update = data[sepgp.loot_index.update] ~= nil
+      sepgp:addOrUpdateLoot(data,update)
+      sepgp_loot:Refresh()
+      return
+    elseif reason == "timeout" then
+      return
+    end
+  end,
+  OnShow = function()
+    this.menuFrame = this.menuFrame or CreateFrame("Frame", "sepgp_auto_gp_menuframe", UIParent, "UIDropDownMenuTemplate")
+  end,
+  OnHide = function()
+    CloseDropDownMenus()
+  end,
+  timeout = 0,
+  exclusive = 1,
+  whileDead = 0,
+  hideOnEscape = 1
+}
+
+function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode)
+  if ( displayMode == "MENU" ) then
+    menuFrame.displayMode = displayMode
+  end
+  UIDropDownMenu_Initialize(menuFrame, function() sepgp:EasyMenu_Initialize(level, menuList) end, displayMode, nil, menuList)
+  ToggleDropDownMenu(1, nil, menuFrame, anchor, x, y, menuList)
+end
+function sepgp:EasyMenu_Initialize(level, menuList)
+  for index = 1, table.getn( menuList ) do
+    value = menuList[index]
+    if (value.text) then
+      value.index = index;
+      UIDropDownMenu_AddButton( value, level );
+    end
+  end
+end

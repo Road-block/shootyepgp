@@ -2,11 +2,11 @@
 ## Title: shootyepgp
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: Roadblock
-## X-Credits: shooty for original version
-## Version: 3.16
+## X-Credits: shooty
+## Version: 3.17
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
-## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver
+## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver, sepgp_looted
 
 Libs\AceLibrary\AceLibrary.lua
 Libs\AceOO-2.0\AceOO-2.0.lua
@@ -19,18 +19,21 @@ Libs\AceDB-2.0\AceDB-2.0.lua
 Libs\AceDebug-2.0\AceDebug-2.0.lua
 Libs\AceLocale-2.2\AceLocale-2.2.lua
 
+Libs\Deformat-2.0\Deformat-2.0.lua
 Libs\Babble-Class-2.2\Babble-Class-2.2.lua
 Libs\Babble-Zone-2.2\Babble-Zone-2.2.lua
 Libs\Crayon-2.0\Crayon-2.0.lua
 Libs\Compost-2.0\Compost-2.0.lua
 Libs\Dewdrop-2.0\Dewdrop-2.0.lua
-Libs\FuBarPlugin-2.0\FuBarPlugin-2.0.lua
 Libs\Tablet-2.0\Tablet-2.0.lua
+Libs\Gratuity-2.0\Gratuity-2.0.lua
+Libs\FuBarPlugin-2.0\FuBarPlugin-2.0.lua
 
 shootyepgp.lua
 migrations.lua
-standings.lua
-reserves.lua
-bids.lua
 prices.lua
+standings.lua
+bids.lua
+loot.lua
+reserves.lua
 logs.lua
