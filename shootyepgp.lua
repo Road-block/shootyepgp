@@ -58,6 +58,9 @@ sepgp.timer = CreateFrame("Frame")
 sepgp.timer.cd_text = ""
 sepgp.timer:Hide()
 sepgp.timer:SetScript("OnUpdate",function() sepgp.OnUpdate(this,arg1) end)
+sepgp.timer:SetScript("OnEvent",function() 
+
+end)
 
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_saychannel == nil then sepgp_saychannel = "GUILD" end
@@ -150,7 +153,13 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
 
 end
 
+sepgp._lastRosterRequest = false
 function sepgp:OnMenuRequest()
+  local now = GetTime()
+  if not self._lastRosterRequest or (now - self._lastRosterRequest > 2) then
+    self._lastRosterRequest = now
+    GuildRoster()
+  end
   D:FeedAceOptionsTable(self:buildMenu())
 end
 
@@ -524,8 +533,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
     end
     if msg and msg~="" then
       self:defaultPrint(msg)
-      local report = self:my_epgp()
-      self:defaultPrint(report)
+      self:my_epgp()
     end
   end
 end
@@ -797,11 +805,16 @@ function sepgp:gp_reset_v3()
   end
 end
 
-function sepgp:my_epgp()
+function sepgp:my_epgp_announce()
   local ep,gp = (self:get_ep_v3(playerName) or 0), (self:get_gp_v3(playerName) or sepgp.VARS.basegp)
   local pr = ep/gp
   local msg = string.format("You now have: %d EP %d GP |cffffff00%.03f|r|cffff7f00PR|r.", ep,gp,pr)
-  return msg
+  self:defaultPrint(msg)
+end
+
+function sepgp:my_epgp()
+  GuildRoster()
+  self:ScheduleEvent("shootyepgpRosterRefresh",self.my_epgp_announce,2,self)
 end
 
 ---------
@@ -1322,6 +1335,7 @@ end
 ----------------
 -- test: "You receive loot: \124cffa335ee\124Hitem:16866:0:0:0\124h[Helm of Might]\124h\124r."
 -- test: "Raerlas receives loot: \124cffa335ee\124Hitem:16846:0:0:0\124h[Giantstalker's Helmet]\124h\124r."
+-- test: /run sepgp:captureLoot("Stunted receives loot: \124cffa335ee\124Hitem:16804:0:0:0\124h[Felheart Bracers]\124h\124r.")
 sepgp.loot_index = {
   time=1,
   player=2,
@@ -1671,7 +1685,7 @@ StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
   button1 = "GP Actions",
   button2 = "Remind me Later",
   OnAccept = function()
-    sepgp:EasyMenu(sepgp_auto_gp_menu, this:GetParent().menuFrame, this, 0, 0, "MENU")
+    sepgp:EasyMenu(sepgp_auto_gp_menu, sepgp._menuFrame, this, 0, 0, "MENU")
     return true
   end,
   OnCancel = function(data,reason)
@@ -1686,7 +1700,7 @@ StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
     end
   end,
   OnShow = function()
-    this.menuFrame = this.menuFrame or CreateFrame("Frame", "sepgp_auto_gp_menuframe", UIParent, "UIDropDownMenuTemplate")
+    sepgp._menuFrame = sepgp._menuFrame or CreateFrame("Frame", "sepgp_auto_gp_menuframe", UIParent, "UIDropDownMenuTemplate")
   end,
   OnHide = function()
     CloseDropDownMenus()
