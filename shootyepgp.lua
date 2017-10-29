@@ -1403,7 +1403,7 @@ function sepgp:tradeLoot(playerState,targetState)
         end
         local bind = self:itemBinding(itemString)
         if (not bind) or (bind ~= self.VARS.boe) then return end
-        if UnitExists("target") and UnitIsPlayer("target") and UnitCanCooperate("target") and (not UnitIsUnit("player","target")) then
+        if UnitExists("target") and UnitIsPlayer("target") and UnitCanCooperate("player","target") and (not UnitIsUnit("player","target")) then
           local tradeTarget = UnitName("target")
           local _, class = self:verifyGuildMember(tradeTarget,true)
           if not (class) then return end
