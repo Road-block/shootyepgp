@@ -16,23 +16,23 @@ shootyepgp requires some modifications to guild permissions for officer notes by
 Creating a new chatframe (right-click > create new window on chat tab) and naming it `debug` (capitalization doesn't matter) will move the bulk of information messages there and out of your default chatframe.
 
 ## usage
-Right-click on minimap or FuBar shootyepgp icon show all available settings.  
+Right-click on minimap or FuBar shootyepgp icon will show all available settings.  
 Left-click shows the standings window with everyone's EP, GP and PR values. 
-The standings window can also be used to toggled with **/shooty** chat command 
+The standings window can also be used to toggled with **/shooty** chat command. 
 
 ## features
 - EPGP standings list (all)
 - Simple chatlink click to bid on items (all)
 - Item Bids list (admin/ML)
 - Item GP prices on item tooltips (all)
-- Export standings to cvs (all)
+- Export standings to csv (all)
 - Configurable EPGP Decay (admin)
 - Configurable Offspec discount (all)
 - Guild Progression multiplier (all)
 - Reserves - *standby list EP* - with alts support (admin and all)
 
-Addon has been designed so that the main member functionality is available even without the addon. 
-- `/w masterlooter +` (for main spec) or `/w masterlooter -` (for off spec) after the loot officer links a piece of loot and asks for bids in raid chat.  
+Addon has been designed so that basic member functionality is usable even without the addon. 
+- `/w <masterlooter name> +` (for main spec) or `/w <masterlooter name> -` (for off spec) after the loot officer links a piece of loot and asks for bids in raid chat.  
 - Type `/x +` (where x is the number of the custom channel) or `/x +MainName` if on an alt to respond to a standby list afk check.  
 Having the addon makes everything more convenient, but is not mandatory.
 
