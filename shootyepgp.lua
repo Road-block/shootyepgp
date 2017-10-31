@@ -20,7 +20,8 @@ sepgp.VARS = {
   msgp = "Mainspec GP",
   osgp = "Offspec GP",
   bankde = "Bank-D/E",
-  reminder = C:Red("Unassigned")
+  reminder = C:Red("Unassigned"),
+  url = "https://github.com/Road-block/shootyepgp/releases/latest"
 }
 local playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
@@ -59,7 +60,6 @@ sepgp.timer.cd_text = ""
 sepgp.timer:Hide()
 sepgp.timer:SetScript("OnUpdate",function() sepgp.OnUpdate(this,arg1) end)
 sepgp.timer:SetScript("OnEvent",function() 
-
 end)
 
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
@@ -212,10 +212,17 @@ function sepgp:delayedInit()
     self:reservesToggle(true)
   end
   -- migrate EPGP storage if needed
-  local _,_,major_ver = string.find((GetAddOnMetadata("shootyepgp","Version")),"^(%d+)%.[%d%.%-]+$")
-  major_ver = tonumber(major_ver)
+  sepgp._versionString = GetAddOnMetadata("shootyepgp","Version")
+  self:parseVersion(sepgp._versionString)
+  local major_ver = self._version.major
   if IsGuildLeader() and ( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
     sepgp[string.format("v%dtov%d",(sepgp_dbver or 2),major_ver)](sepgp)
+  end
+  -- broadcast our version
+  local addonMsg = string.format("VERSION;%s;%d",sepgp._versionString,major_ver)
+  self:addonMessage(addonMsg,"GUILD")
+  if (IsGuildLeader()) then
+    self:shareSettings()
   end
   -- safe officer note setting when we are admin
   if (admin()) then
@@ -507,7 +514,8 @@ end
 function sepgp:addonComms(prefix,message,channel,sender)
   if not prefix == self.VARS.prefix then return end -- we don't care for messages from other addons
   if sender == playerName then return end -- we don't care for messages from ourselves
-  if not self:verifyGuildMember(sender,true) then return end -- only accept messages from guild members
+  local name_g,class,rank = self:verifyGuildMember(sender,true)
+  if not (name_g) then return end -- only accept messages from guild members
   local who,what,amount
   for name,epgp,change in string.gfind(message,"([^;]+);([^;]+);([^;]+)") do
     who=name
@@ -530,11 +538,63 @@ function sepgp:addonComms(prefix,message,channel,sender)
       msg = string.format("%s%% decay to EP and GP.",amount)
     elseif who == "RAID" and what == "AWARD" then
       msg = string.format("%d EP awarded to Raid.",amount)
+    elseif who == "VERSION" then
+      local out_of_date, version_type = self:parseVersion(self._versionString,what)
+      if (out_of_date) and self._newVersionNotification == nil then
+        self._newVersionNotification = true -- only inform once per session
+        self:defaultPrint(string.format("New %s version available: |cff00ff00%s|r",version_type,what))
+        self:defaultPrint(string.format("Visit %s to update.",self.VARS.url))
+      end
+      if (IsGuildLeader()) then
+        self:shareSettings()
+      end
+    elseif who == "SETTINGS" then
+      for progress,discount,decay in string.gfind(what,"([^:]+):([^:]+):([^:]+)") do
+        discount = tonumber(discount)
+        decay = tonumber(decay)
+        local settings_notice
+        if progress and progress ~= sepgp_progress then
+          sepgp_progress = progress
+          settings_notice = "New raid progress"
+        end
+        if discount and discount ~= sepgp_discount then
+          sepgp_discount = discount
+          if (settings_notice) then
+            settings_notice = settings_notice..", offspec price %"
+          else
+            settings_notice = "New offspec price %"
+          end
+        end
+        if decay and decay ~= sepgp_decay then
+          sepgp_decay = decay
+          if (admin()) then
+            if (settings_notice) then
+              settings_notice = settings_notice..", decay %"
+            else
+              settings_notice = "New decay %"
+            end
+          end
+        end
+        if (settings_notice) and settings_notice ~= "" then
+          local sender_rank = string.format("%s(%s)",C:Colorize(BC:GetHexColor(class),sender),rank)
+          settings_notice = settings_notice..string.format(" settings accepted from %s",sender_rank)
+          self:defaultPrint(settings_notice)
+        end
+      end
     end
     if msg and msg~="" then
       self:defaultPrint(msg)
       self:my_epgp()
     end
+  end
+end
+
+function sepgp:shareSettings(force)
+  local now = GetTime()
+  if self._lastSettingsShare == nil or (now - self._lastSettingsShare > 30) or (force) then
+    self._lastSettingsShare = now
+    local addonMsg = string.format("SETTINGS;%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay)
+    self:addonMessage(addonMsg,"GUILD")
   end
 end
 
@@ -839,14 +899,14 @@ end
 
 function sepgp:OnClick()
   local is_admin = admin()
-  if (IsControlKeyDown() and is_admin) then
+  if (IsControlKeyDown() and IsShiftKeyDown() and is_admin) then
+    sepgp_logs:Toggle()
+  elseif (IsControlKeyDown() and is_admin) then
     sepgp_reserves:Toggle()
+  elseif (IsShiftKeyDown() and is_admin) then
+    sepgp_loot:Toggle()      
   elseif (IsAltKeyDown() and is_admin) then
     sepgp_bids:Toggle()
-  elseif (IsShiftKeyDown() and is_admin) then
-    sepgp_loot:Toggle()
-  elseif (IsShiftKeyDown() and IsControlKeyDown() and is_admin) then
-    sepgp_logs:Toggle()
   else
     sepgp_standings:Toggle()
   end
@@ -1014,7 +1074,13 @@ function sepgp:buildMenu()
       desc = "Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.\nUsed for suggested EP awards.",
       order = 90,
       get = function() return sepgp_progress end,
-      set = function(v) sepgp_progress = v sepgp_bids:Refresh() end,
+      set = function(v) 
+        sepgp_progress = v 
+        sepgp_bids:Refresh() 
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
       validate = { ["T3"]="4.Naxxramas", ["T2.5"]="3.Temple of Ahn\'Qiraj", ["T2"]="2.Blackwing Lair", ["T1"]="1.Molten Core"},
     }
     options.args["report_channel"] = {
@@ -1045,6 +1111,9 @@ function sepgp:buildMenu()
       set = function(v) 
         sepgp_decay = (1 - v)
         options.args["decay"].desc = string.format("Decays all EPGP by %s%%",(1-sepgp_decay)*100)
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
       end,
       min = 0.01,
       max = 0.5,
@@ -1059,7 +1128,12 @@ function sepgp:buildMenu()
       desc = "Set Offspec Items GP Percent.",
       order = 115,
       get = function() return sepgp_discount end,
-      set = function(v) sepgp_discount = v end,
+      set = function(v) 
+        sepgp_discount = v
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
       min = 0,
       max = 1,
       step = 0.05,
@@ -1561,6 +1635,42 @@ function sepgp:suggestedAwardEP()
     return multiplier*sepgp.VARS.baseaward_ep
   else
     return sepgp.VARS.baseaward_ep
+  end
+end
+
+function sepgp:parseVersion(version,otherVersion)
+  if not sepgp._version then sepgp._version = {} end
+  for major,minor,patch in string.gfind(version,"(%d+)[^%d]?(%d*)[^%d]?(%d*)") do
+    sepgp._version.major = tonumber(major)
+    sepgp._version.minor = tonumber(minor)
+    sepgp._version.patch = tonumber(patch)
+  end
+  if (otherVersion) then
+    if not sepgp._otherversion then sepgp._otherversion = {} end
+    for major,minor,patch in string.gfind(otherVersion,"(%d+)[^%d]?(%d*)[^%d]?(%d*)") do
+      sepgp._otherversion.major = tonumber(major)
+      sepgp._otherversion.minor = tonumber(minor)
+      sepgp._otherversion.patch = tonumber(patch)      
+    end
+    if (sepgp._otherversion.major ~= nil and sepgp._version.major ~= nil) then
+      if (sepgp._otherversion.major > sepgp._version.major) then
+        return true, "major"
+      elseif (sepgp._otherversion.major == sepgp._version.major) then
+        if (sepgp._otherversion.minor ~= nil and sepgp._version.minor ~= nil) then
+          if (sepgp._otherversion.minor > sepgp._version.minor) then
+            return true, "minor"
+          elseif (sepgp._otherversion.patch ~= nil and sepgp._version.patch ~= nil) then
+            if (sepgp._otherversion.patch > sepgp._version.patch) then
+              return true, "patch"
+            end
+          elseif (sepgp._otherversion.patch ~= nil and sepgp._version.patch == nil) then
+            return true, "patch"
+          end
+        elseif (sepgp._otherversion.minor ~= nil and sepgp._version.minor == nil) then
+          return true, "minor"
+        end
+      end
+    end
   end
 end
 

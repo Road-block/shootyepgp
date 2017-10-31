@@ -2,8 +2,10 @@
 ## Title: shootyepgp
 ## Notes: Effort Points/Gear Points Loot System
 ## Author: Roadblock
+## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
+## X-Category: Guild
 ## X-Credits: shooty
-## Version: 3.18
+## Version: 3.19
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
 ## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver, sepgp_looted
