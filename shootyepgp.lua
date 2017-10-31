@@ -21,7 +21,6 @@ sepgp.VARS = {
   osgp = "Offspec GP",
   bankde = "Bank-D/E",
   reminder = C:Red("Unassigned"),
-  url = "https://github.com/Road-block/shootyepgp/releases/latest"
 }
 local playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
@@ -213,6 +212,7 @@ function sepgp:delayedInit()
   end
   -- migrate EPGP storage if needed
   sepgp._versionString = GetAddOnMetadata("shootyepgp","Version")
+  sepgp._websiteString = GetAddOnMetadata("shootyepgp","X-Website")
   self:parseVersion(sepgp._versionString)
   local major_ver = self._version.major
   if IsGuildLeader() and ( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
@@ -543,7 +543,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
       if (out_of_date) and self._newVersionNotification == nil then
         self._newVersionNotification = true -- only inform once per session
         self:defaultPrint(string.format("New %s version available: |cff00ff00%s|r",version_type,what))
-        self:defaultPrint(string.format("Visit %s to update.",self.VARS.url))
+        self:defaultPrint(string.format("Visit %s to update.",self._websiteString))
       end
       if (IsGuildLeader()) then
         self:shareSettings()
@@ -1466,7 +1466,7 @@ end
 
 function sepgp:findLootReminder(itemLink)
   for i,data in ipairs(sepgp_looted) do
-    if data[self.loot_index.item] == itemLink --[[and data[self.loot_index.action] == self.VARS.reminder]] then
+    if data[self.loot_index.item] == itemLink and data[self.loot_index.action] == self.VARS.reminder then
       return data
     end
   end
@@ -1497,7 +1497,7 @@ function sepgp:tradeLoot(playerState,targetState)
           if not (class) then return end
           local target_color = C:Colorize(BC:GetHexColor(class),tradeTarget)
           local timestamp = date("%b/%d %H:%M:%S")
-          local data = self:findLootReminder(itemLink) -- verify that it updates the data in the referenced table and not creating a copy
+          local data = self:findLootReminder(itemLink)
           if (data) then
             data[self.loot_index.time] = timestamp
             data[self.loot_index.player] = tradeTarget
