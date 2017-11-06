@@ -11,7 +11,7 @@ sepgp.VARS = {
   baseaward_ep = 100,
   decay = 0.85,
   max = 5000,
-  timeout = 45,
+  timeout = 60,
   maxloglines = 500,
   prefix = "SEPGP_PREFIX",
   bop = C:Red("BoP"),
@@ -24,7 +24,7 @@ sepgp.VARS = {
 }
 local playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
-local shooty_reservecall = string.format("{shootyepgp}Type \"+\" in this channel if on main, or \"+<MainName>\" if on alt within %dsec.",sepgp.VARS.timeout)
+local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
 local shooty_reserveanswer = "^(%+)(%a*)$"
 local out = "|cff9664c8shootyepgp:|r %s"
 local lastUpdate = 0
@@ -172,6 +172,15 @@ function sepgp:TipHook()
       if (link_found) then
         local bind = self:itemBinding(itemString) or ""
         ml_tip = is_master and bind == sepgp.VARS.boe
+        if (ml_tip) then
+          local frame = GetMouseFocus()
+          if (frame) and (frame.IsFrameType ~= nil) and (frame:IsFrameType("Button"))  then
+            if not (frame._hasExtraClicks) then
+              frame:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
+              frame._hasExtraClicks = true              
+            end
+          end
+        end
       end
     end
     sepgp:AddDataToTooltip(GameTooltip, itemLink, nil, ml_tip)
@@ -179,6 +188,15 @@ function sepgp:TipHook()
   )
   self:SecureHook(GameTooltip, "SetLootItem", function(this, slot)
     local is_master = (sepgp:lootMaster()) and true or nil
+    if (is_master) then
+      local frame = GetMouseFocus()
+      if (frame) and (frame.IsFrameType ~= nil) and (frame:IsFrameType("Button"))  then
+        if not (frame._hasExtraClicks) then
+          frame:RegisterForClicks("LeftButtonUp","RightButtonUp","MiddleButtonUp")
+          frame._hasExtraClicks = true              
+        end
+      end
+    end
     sepgp:AddDataToTooltip(GameTooltip, GetLootSlotLink(slot), nil, is_master)
   end
   )
@@ -360,11 +378,11 @@ function sepgp:LootFrameItem_OnClick(button,data)
     local itemLink = GetLootSlotLink(slot)
     if (itemLink) then
       if button == "LeftButton" then
-        self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
+        self:widestAudience(string.format("Whisper me + for %s (mainspec)",itemLink))
       elseif button == "RightButton" then
-        self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
+        self:widestAudience(string.format("Whisper me - for %s (offspec)",itemLink))
       elseif button == "MiddleButton" then
-        self:widestAudience(string.format("Whisper + or - for %s",itemLink))
+        self:widestAudience(string.format("Whisper me + or - for %s (mainspec or offspec)",itemLink))
       end
     end
   end
@@ -392,13 +410,13 @@ function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
       local bind = self:itemBinding(itemString) or ""
       if (bind == self.VARS.boe) then
         if button == "LeftButton" then
-          self:widestAudience(string.format("Whisper + for %s (mainspec)",itemLink))
+          self:widestAudience(string.format("Whisper me + for %s (mainspec)",itemLink))
           return
         elseif button == "RightButton" then
-          self:widestAudience(string.format("Whisper - for %s (offspec)",itemLink))
+          self:widestAudience(string.format("Whisper me - for %s (offspec)",itemLink))
           return
         elseif button == "MiddleButton" then
-          self:widestAudience(string.format("Whisper + or - for %s",itemLink))
+          self:widestAudience(string.format("Whisper me + or - for %s (mainspec or offspec)",itemLink))
           return
         end    
       end      
@@ -538,6 +556,8 @@ function sepgp:addonComms(prefix,message,channel,sender)
       msg = string.format("%s%% decay to EP and GP.",amount)
     elseif who == "RAID" and what == "AWARD" then
       msg = string.format("%d EP awarded to Raid.",amount)
+    elseif who == "RESERVES" and what == "AWARD" then
+      msg = string.format("%d EP awarded to Reserves.",amount)
     elseif who == "VERSION" then
       local out_of_date, version_type = self:parseVersion(self._versionString,what)
       if (out_of_date) and self._newVersionNotification == nil then
@@ -754,7 +774,7 @@ end
 function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
   if table.getn(sepgp.reserves) > 0 then
     for i, reserve in ipairs(sepgp.reserves) do
-      local name, class, rank, alt = unpack(reserve[i])
+      local name, class, rank, alt = unpack(reserve)
       self:givename_ep(name,ep)
     end
     self:simpleSay(string.format("Giving %d ep to active reserves",ep))
@@ -763,6 +783,7 @@ function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
     self:addonMessage(addonMsg,"GUILD")
     sepgp.reserves = {}
     reserves_blacklist = {}
+    sepgp_reserves:Refresh()
   end
 end
 
@@ -1407,9 +1428,10 @@ end
 ----------------
 -- Loot Tracker
 ----------------
+-- /script DEFAULT_CHAT_FRAME:AddMessage("\124cffa335ee\124Hitem:16864:0:0:0:0:0:0:0:0\124h[Belt of Might]\124h\124r");
 -- test: "You receive loot: \124cffa335ee\124Hitem:16866:0:0:0\124h[Helm of Might]\124h\124r."
--- test: "Raerlas receives loot: \124cffa335ee\124Hitem:16846:0:0:0\124h[Giantstalker's Helmet]\124h\124r."
--- test: /run sepgp:captureLoot("Stunted receives loot: \124cffa335ee\124Hitem:16804:0:0:0\124h[Felheart Bracers]\124h\124r.")
+-- test: /run sepgp:captureLoot("Raerlas receives loot: \124cffa335ee\124Hitem:16846:0:0:0\124h[Giantstalker's Helmet]\124h\124r.")
+-- test: /run sepgp:captureLoot("You receive loot: \124cffa335ee\124Hitem:16864:0:0:0\124h[Belt of Might]\124h\124r.")
 sepgp.loot_index = {
   time=1,
   player=2,
@@ -1422,7 +1444,7 @@ sepgp.loot_index = {
   update=9
 }
 function sepgp:captureLoot(message)
-  if not (UnitInRaid("player") and self:lootMaster()) then return end
+  if not (UnitInRaid("player") and self:lootMaster() and admin()) then return end
   local who,what,amount,player,itemLink
   who,what,amount = DF:Deformat(message,LOOT_ITEM_MULTIPLE)
   if (amount) then -- skip multiples / stacks
@@ -1473,7 +1495,7 @@ function sepgp:findLootReminder(itemLink)
 end
 
 function sepgp:tradeLoot(playerState,targetState)
-  if not (UnitInRaid("player") and self:lootMaster()) then return end
+  if not (UnitInRaid("player") and self:lootMaster() and admin()) then return end
   if (playerState ~= nil and targetState ~= nil) and playerState == 1 and targetState == 1 then
     local itemLink
     for id=1,MAX_TRADABLE_ITEMS do
@@ -1724,13 +1746,25 @@ StaticPopupDialogs["SHOOTY_EPGP_SET_MAIN"] = {
   hideOnEscape = 1  
 }
 StaticPopupDialogs["SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE"] = {
-  text = "Reserves: AFKCheck. Are you available?",
+  text = " ",
   button1 = TEXT(YES),
   button2 = TEXT(NO),
+  OnShow = function()
+    this._timeout = sepgp.VARS.timeout-1
+  end,
+  OnUpdate = function(elapsed,dialog)
+    this._timeout = this._timeout - elapsed
+    getglobal(dialog:GetName().."Text"):SetText(string.format("Reserves AFKCheck. Are you available? |cff00ff00%0d|rsec.",this._timeout))
+    if (this._timeout<=0) then
+      this._timeout = 0
+      dialog:Hide()
+    end
+  end,
   OnAccept = function()
+    this._timeout = 0
     sepgp:sendReserverResponce()
   end,
-  timeout = sepgp.VARS.timeout,
+  timeout = 0,--sepgp.VARS.timeout,
   exclusive = 1,
   showAlert = 1,
   whileDead = 1,

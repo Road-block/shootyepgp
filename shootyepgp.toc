@@ -5,7 +5,7 @@
 ## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
 ## X-Category: Guild
 ## X-Credits: shooty
-## Version: 3.20
+## Version: 3.21
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount
 ## SavedVariablesPerCharacter: sepgp_log, sepgp_dbver, sepgp_looted
