@@ -784,7 +784,7 @@ sepgp_prices = sepgp:NewModule("sepgp_prices", "AceDB-2.0")
 
 function sepgp_prices:GetPrice(item,progress)
   if not progress then progress = "T3" end
-  local itemID,found,_,itemString,data,tier
+  local itemID,found,_,itemString,data,tier,is,il
   local price
   if (type(item)=="number") then
     itemID = tonumber(item)
@@ -811,3 +811,6 @@ function sepgp_prices:GetPrice(item,progress)
   end
   return price
 end
+
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs

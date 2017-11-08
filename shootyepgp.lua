@@ -28,7 +28,7 @@ local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or 
 local shooty_reserveanswer = "^(%+)(%a*)$"
 local out = "|cff9664c8shootyepgp:|r %s"
 local lastUpdate = 0
-local needInit = true
+local needInit,needRefresh = true
 local admin,sanitizeNote
 local shooty_debugchat
 local running_check,running_bid
@@ -1864,10 +1864,13 @@ function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode)
 end
 function sepgp:EasyMenu_Initialize(level, menuList)
   for index = 1, table.getn( menuList ) do
-    value = menuList[index]
+    local value = menuList[index]
     if (value.text) then
       value.index = index;
       UIDropDownMenu_AddButton( value, level );
     end
   end
 end
+
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
