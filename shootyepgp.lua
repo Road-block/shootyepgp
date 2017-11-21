@@ -7,9 +7,9 @@ local BC = AceLibrary("Babble-Class-2.2")
 local DF = AceLibrary("Deformat-2.0")
 local G = AceLibrary("Gratuity-2.0")
 sepgp.VARS = {
-  basegp = 135,
+  basegp = 100,
   baseaward_ep = 100,
-  decay = 0.85,
+  decay = 0.9,
   max = 5000,
   timeout = 60,
   maxloglines = 500,
@@ -22,7 +22,7 @@ sepgp.VARS = {
   bankde = "Bank-D/E",
   reminder = C:Red("Unassigned"),
 }
-local playerName = (UnitName("player"))
+sepgp._playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
 local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
 local shooty_reserveanswer = "^(%+)(%a*)$"
@@ -50,8 +50,7 @@ do
     hexColorQuality[ITEM_QUALITY_COLORS[i].hex] = i
   end
 end
--- TODO:
--- 2. Implement an Import facility to mirror Export.
+
 sepgp.reserves = {}
 sepgp.bids_main,sepgp.bids_off,sepgp.bid_item = {},{},{}
 sepgp.timer = CreateFrame("Frame")
@@ -260,20 +259,22 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
   if not price then return end
   local line_limit, left1,right1
   if (is_master) then 
-    line_limit = 28 
+    line_limit = 27 
     left1,right1 = C:Yellow("Alt Click/RClick/MClick"), C:Orange("Call for: MS/OS/Both")
   else 
-    line_limit = 29 
+    line_limit = 28 
   end
-  local ep,gp = (self:get_ep_v3(playerName) or 0), (self:get_gp_v3(playerName) or sepgp.VARS.basegp)
+  local ep,gp = (self:get_ep_v3(self._playerName) or 0), (self:get_gp_v3(self._playerName) or sepgp.VARS.basegp)
   local off_price = math.floor(price*sepgp_discount)
   local pr,new_pr,new_pr_off = ep/gp, ep/(gp+price), ep/(gp+off_price)
   local pr_delta = new_pr - pr
   local pr_delta_off = new_pr_off - pr
-  local textRight = string.format("gp:|cff32cd32%d|r(|cffff0000%.02f|r|cffff7f00pr|r) os:|cff20b2aa%d|r(|cffff0000%.02f|r|cffff7f00pr|r)",price,new_pr,off_price,new_pr_off)
+  local textRight = string.format("gp:|cff32cd32%d|r gp_os:|cff20b2aa%d|r",price,off_price)
+  local textRight2 = string.format("pr:|cffff0000%.02f|r(%.02f) pr_os:|cffff0000%.02f|r(%.02f)",pr_delta,new_pr,pr_delta_off,new_pr_off)
   if (tooltip:NumLines() < line_limit) then
     tooltip:AddLine(" ")
     tooltip:AddDoubleLine("|cff9664c8shootyepgp|r",textRight)
+    tooltip:AddDoubleLine(" ",textRight2)
     if (is_master) then
       tooltip:AddDoubleLine(left1,right1)
     end
@@ -285,7 +286,8 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
     sepgp.extratip:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", 0, -5)
     --sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
     sepgp.extratip:SetText("|cff9664c8shootyepgp|r")
-    sepgp.extratip:AddLine(textRight)
+    sepgp.extratip:AddDoubleLine(" ",textRight)
+    sepgp.extratip:AddDoubleLine(" ",textRight2)
     if (is_master) then
       sepgp.extratip:AddDoubleLine(left1,right1)
     end
@@ -531,7 +533,7 @@ end
 
 function sepgp:addonComms(prefix,message,channel,sender)
   if not prefix == self.VARS.prefix then return end -- we don't care for messages from other addons
-  if sender == playerName then return end -- we don't care for messages from ourselves
+  if sender == self._playerName then return end -- we don't care for messages from ourselves
   local name_g,class,rank = self:verifyGuildMember(sender,true)
   if not (name_g) then return end -- only accept messages from guild members
   local who,what,amount
@@ -542,7 +544,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
   end
   if (who) and (what) and (amount) then
     local msg
-    if who == playerName then
+    if who == self._playerName then
       if what == "EP" then
         if amount < 0 then
           msg = string.format("You have received a %d EP penalty.",amount)
@@ -886,16 +888,41 @@ function sepgp:gp_reset_v3()
   end
 end
 
+function sepgp:capcalc(ep,gp,gain)
+  -- CAP_EP = EP_GAIN*DECAY/(1-DECAY) CAP_PR = CAP_EP/base_gp
+  local pr = ep/gp
+  local ep_decayed = self:num_round(ep*sepgp_decay)
+  local gp_decayed = math.max(sepgp.VARS.basegp,self:num_round(gp*sepgp_decay))
+  local pr_decay = tonumber(string.format("%.03f",pr))-tonumber(string.format("%.03f",ep_decayed/gp_decayed))
+  if pr_decay < 0.01 then 
+    pr_decay = 0 
+  else
+    pr_decay = -tonumber(string.format("%.02f",pr_decay))
+  end
+  local cycle_gain = tonumber(gain)
+  local cap_ep, cap_pr
+  if (cycle_gain) then
+    cap_ep = self:num_round(cycle_gain*sepgp_decay/(1-sepgp_decay))
+    cap_pr = tonumber(string.format("%.03f",cap_ep/sepgp.VARS.basegp))
+  end
+  return pr_decay, cap_ep, cap_pr
+end
+
 function sepgp:my_epgp_announce()
-  local ep,gp = (self:get_ep_v3(playerName) or 0), (self:get_gp_v3(playerName) or sepgp.VARS.basegp)
+  local ep,gp = (self:get_ep_v3(self._playerName) or 0), (self:get_gp_v3(self._playerName) or sepgp.VARS.basegp)
   local pr = ep/gp
   local msg = string.format("You now have: %d EP %d GP |cffffff00%.03f|r|cffff7f00PR|r.", ep,gp,pr)
   self:defaultPrint(msg)
+  local pr_decay, cap_ep, cap_pr = self:capcalc(ep,gp)
+  if pr_decay < 0 then
+    msg = string.format("Close to EPGP Cap. Next Decay will change your |cffff7f00PR|r by |cffff0000%.4g|r.",pr_decay)
+    self:defaultPrint(msg)
+  end
 end
 
 function sepgp:my_epgp()
   GuildRoster()
-  self:ScheduleEvent("shootyepgpRosterRefresh",self.my_epgp_announce,2,self)
+  self:ScheduleEvent("shootyepgpRosterRefresh",self.my_epgp_announce,3,self)
 end
 
 ---------
@@ -1244,7 +1271,7 @@ end
 function sepgp:sendReserverResponce()
   if sepgp.reservesChannelID ~= nil then
     if (sepgp_main) then
-      if sepgp_main == playerName then
+      if sepgp_main == self._playerName then
         SendChatMessage("+","CHANNEL",nil,sepgp.reservesChannelID)
       else
         SendChatMessage(string.format("+%s",sepgp_main),"CHANNEL",nil,sepgp.reservesChannelID)
@@ -1352,7 +1379,7 @@ function sepgp:captureLootCall(text, sender)
     if (link_found) then
       local quality = hexColorQuality[itemColor] or -1
       if (quality >= 3) then
-        if (IsRaidLeader() or self:lootMaster()) and (sender == playerName) then
+        if (IsRaidLeader() or self:lootMaster()) and (sender == self._playerName) then
           self:clearBids(true)
           sepgp.bid_item.link = itemString
           sepgp.bid_item.linkFull = itemLink
@@ -1594,6 +1621,13 @@ function sepgp:num_round(i)
   return math.floor(i+0.5)
 end
 
+function sepgp:strsplit(delimiter, subject)
+  local delimiter, fields = delimiter or ":", {}
+  local pattern = string.format("([^%s]+)", delimiter)
+  string.gsub(subject, pattern, function(c) fields[table.getn(fields)+1] = c end)
+  return unpack(fields)
+end
+
 function sepgp:verifyGuildMember(name,silent)
   for i=1,GetNumGuildMembers(1) do
     local g_name, g_rank, g_rankIndex, g_level, g_class, g_zone, g_note, g_officernote, g_online = GetGuildRosterInfo(i)
@@ -1791,7 +1825,7 @@ local sepgp_auto_gp_menu = {
     if (dialog) then
       local data = dialog.data
       local player, price = data[sepgp.loot_index.player], data[sepgp.loot_index.price]
-      sepgp:givename_gp((player==YOU and playerName or player),price)
+      sepgp:givename_gp((player==YOU and sepgp._playerName or player),price)
       data[sepgp.loot_index.action] = sepgp.VARS.msgp
       local update = data[sepgp.loot_index.update] ~= nil
       sepgp:addOrUpdateLoot(data,update)
@@ -1804,7 +1838,7 @@ local sepgp_auto_gp_menu = {
     if (dialog) then
       local data = dialog.data
       local player, off_price = data[sepgp.loot_index.player], data[sepgp.loot_index.off_price]
-      sepgp:givename_gp((player==YOU and playerName or player),off_price)
+      sepgp:givename_gp((player==YOU and sepgp._playerName or player),off_price)
       data[sepgp.loot_index.action] = sepgp.VARS.osgp
       local update = data[sepgp.loot_index.update] ~= nil
       sepgp:addOrUpdateLoot(data,update)
