@@ -1709,20 +1709,28 @@ function sepgp:parseVersion(version,otherVersion)
       sepgp._otherversion.patch = tonumber(patch)      
     end
     if (sepgp._otherversion.major ~= nil and sepgp._version.major ~= nil) then
-      if (sepgp._otherversion.major > sepgp._version.major) then
-        return true, "major"
-      elseif (sepgp._otherversion.major == sepgp._version.major) then
+      if (sepgp._otherversion.major < sepgp._version.major) then -- we are newer
+        return
+      elseif (sepgp._otherversion.major > sepgp._version.major) then -- they are newer
+        return true, "major"        
+      else -- tied on major, go minor
         if (sepgp._otherversion.minor ~= nil and sepgp._version.minor ~= nil) then
-          if (sepgp._otherversion.minor > sepgp._version.minor) then
+          if (sepgp._otherversion.minor < sepgp._version.minor) then -- we are newer
+            return
+          elseif (sepgp._otherversion.minor > sepgp._version.minor) then -- they are newer
             return true, "minor"
-          elseif (sepgp._otherversion.patch ~= nil and sepgp._version.patch ~= nil) then
-            if (sepgp._otherversion.patch > sepgp._version.patch) then
+          else -- tied on minor, go patch
+            if (sepgp._otherversion.patch ~= nil and sepgp._version.patch ~= nil) then
+              if (sepgp._otherversion.patch < sepgp._version.patch) then -- we are newer
+                return
+              elseif (sepgp._otherversion.patch > sepgp._version.patch) then -- they are newwer
+                return true, "patch"
+              end
+            elseif (sepgp._otherversion.patch ~= nil and sepgp._version.patch == nil) then -- they are newer
               return true, "patch"
             end
-          elseif (sepgp._otherversion.patch ~= nil and sepgp._version.patch == nil) then
-            return true, "patch"
-          end
-        elseif (sepgp._otherversion.minor ~= nil and sepgp._version.minor == nil) then
+          end    
+        elseif (sepgp._otherversion.minor ~= nil and sepgp._version.minor == nil) then -- they are newer
           return true, "minor"
         end
       end
