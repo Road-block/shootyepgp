@@ -10,7 +10,7 @@ sepgp.VARS = {
   basegp = 100,
   baseaward_ep = 100,
   decay = 0.9,
-  max = 5000,
+  max = 1000,
   timeout = 60,
   maxloglines = 500,
   prefix = "SEPGP_PREFIX",
@@ -22,6 +22,24 @@ sepgp.VARS = {
   bankde = "Bank-D/E",
   reminder = C:Red("Unassigned"),
 }
+sepgp.cmdtable = {type = "group", handler = sepgp, args = {
+  show = {
+    type = "execute",
+    name = "Standings",
+    desc = "Show Standings Table.",
+    func = function()
+      sepgp_standings:Toggle()
+    end,
+  },
+  restart = {
+    type = "execute",
+    name = "Restart",
+    desc = "Restart shootyepgp if having startup problems.",
+    func = function() 
+      sepgp:OnEnable()
+    end,
+  },
+}}
 sepgp._playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
 local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
@@ -67,56 +85,13 @@ function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_discount == nil then sepgp_discount = 0.25 end
   if sepgp_log == nil then sepgp_log = {} end
   if sepgp_looted == nil then sepgp_looted = {} end
-  sepgp.extratip = CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
-end
-
-function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER_LOGIN, PLAYER_ENTERING_WORLD (3)
-  for i=1,NUM_CHAT_WINDOWS do
-    local tab = getglobal("ChatFrame"..i.."Tab")
-    local cf = getglobal("ChatFrame"..i)
-    local tabName = tab:GetText()
-    if tab ~= nil and (string.lower(tabName) == "debug") then
-      shooty_debugchat = cf
-      ChatFrame_RemoveAllMessageGroups(shooty_debugchat)
-      shooty_debugchat:SetMaxLines(1024)
-      break
-    end
-  end 
-
-  if (sepgp_main == nil) or (sepgp_main == "") then
-    if (IsInGuild()) then
-      StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
-    end
-  end
-
-  if not self:IsEventScheduled("shootyepgpChannelInit") then
-    self:ScheduleEvent("shootyepgpChannelInit",self.delayedInit,2,self)
-  end
-
-  -- if pfUI loaded, skin the extra tooltip
-  if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
-    pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,pfUI_config.tooltip.alpha)
-  end
-  -- hook SetItemRef to parse our client bid links
-  self:Hook("SetItemRef")
-  -- hook tooltip to add our GP values
-  self:TipHook()
-  -- hook LootFrameItem_OnClick to add our own click handlers for bid calls
-  self:SecureHook("LootFrameItem_OnClick")
-  -- hook ContainerFrameItemButton_OnClick to add our own click handlers for bid calls
-  self:Hook("ContainerFrameItemButton_OnClick")
-  -- hook pfUI loot module :(
-  if pfUI ~= nil and pfUI.loot ~= nil and type(pfUI.loot.UpdateLootFrame) == "function" then
-    self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
-  end
-  -- make tablets closable with ESC
-  for i=1,5 do
-    table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
-  end
-  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},function() sepgp_standings:Toggle() end)
+  if sepgp_debug == nil then sepgp_debug = {} end
+  --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnInitialize"})
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
+  --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnEnable"})
+  sepgp.extratip = (sepgp.extratip) or CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
   self:RegisterEvent("GUILD_ROSTER_UPDATE",function() 
       if (arg1) then -- member join /leave
         self:SetRefresh(true)
@@ -126,6 +101,9 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
       self:SetRefresh(true)
     end)
   self:RegisterEvent("PARTY_MEMBERS_CHANGED",function()
+      self:SetRefresh(true)
+    end)
+  self:RegisterEvent("PLAYER_ENTERING_WORLD",function()
       self:SetRefresh(true)
     end)
   self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
@@ -148,7 +126,65 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   else
     self:RegisterEvent("AceEvent_FullyInitialized")
   end
+end
 
+function sepgp:OnDisable()
+  --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnDisable"})
+  self:UnregisterAllEvents()
+end
+
+function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER_LOGIN, PLAYER_ENTERING_WORLD (3)
+  --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="AceEvent_FullyInitialized"})
+  if self._hasInitFull then return end
+  for i=1,NUM_CHAT_WINDOWS do
+    local tab = getglobal("ChatFrame"..i.."Tab")
+    local cf = getglobal("ChatFrame"..i)
+    local tabName = tab:GetText()
+    if tab ~= nil and (string.lower(tabName) == "debug") then
+      shooty_debugchat = cf
+      ChatFrame_RemoveAllMessageGroups(shooty_debugchat)
+      shooty_debugchat:SetMaxLines(1024)
+      break
+    end
+  end 
+
+  if (sepgp_main == nil) or (sepgp_main == "") then
+    if (IsInGuild()) then
+      StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
+    end
+  end
+
+  local delay = 2
+  if self:IsEventRegistered("AceEvent_FullyInitialized") then
+    self:UnregisterEvent("AceEvent_FullyInitialized")
+    delay = 3
+  end  
+  if not self:IsEventScheduled("shootyepgpChannelInit") then
+    self:ScheduleEvent("shootyepgpChannelInit",self.delayedInit,delay,self)
+  end
+
+  -- if pfUI loaded, skin the extra tooltip
+  if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
+    pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,pfUI_config.tooltip.alpha)
+  end
+  -- hook SetItemRef to parse our client bid links
+  self:Hook("SetItemRef")
+  -- hook tooltip to add our GP values
+  self:TipHook()
+  -- hook LootFrameItem_OnClick to add our own click handlers for bid calls
+  self:SecureHook("LootFrameItem_OnClick")
+  -- hook ContainerFrameItemButton_OnClick to add our own click handlers for bid calls
+  self:Hook("ContainerFrameItemButton_OnClick")
+  -- hook pfUI loot module :(
+  if pfUI ~= nil and pfUI.loot ~= nil and type(pfUI.loot.UpdateLootFrame) == "function" then
+    self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
+  end
+  -- make tablets closable with ESC
+  for i=1,5 do
+    table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
+  end
+  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable)
+  self._hasInitFull = true
 end
 
 sepgp._lastRosterRequest = false
@@ -216,6 +252,7 @@ function sepgp:TipHook()
 end
 
 function sepgp:delayedInit()
+  --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="delayedInit"})
   if (IsInGuild()) then
     local guildName = (GetGuildInfo("player"))
     if (guildName) and guildName ~= "" then
@@ -247,6 +284,7 @@ function sepgp:delayedInit()
       self:Hook("GuildRosterSetOfficerNote")
     end
   end
+  self:defaultPrint(string.format("v%s Loaded.",sepgp._versionString))
 end
 
 function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
