@@ -209,7 +209,14 @@ function sepgp_standings:setHideScript()
   end
 end
 
+function sepgp_standings:Top()
+  if T:IsRegistered("sepgp_standings") and (T.registry.sepgp_standings.tooltip) then
+    T.registry.sepgp_standings.tooltip.scroll=0
+  end  
+end
+
 function sepgp_standings:Toggle()
+  self:Top()
   if T:IsAttached("sepgp_standings") then
     T:Detach("sepgp_standings")
     if (T:IsLocked("sepgp_standings")) then
@@ -228,7 +235,7 @@ end
 
 function sepgp_standings:ToggleRaidOnly()
   sepgp_raidonly = not sepgp_raidonly
-  self:Refresh()
+  self:Top()
   sepgp:SetRefresh(true)
 end
 

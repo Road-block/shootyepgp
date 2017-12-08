@@ -60,7 +60,14 @@ function sepgp_loot:setHideScript()
   end
 end
 
+function sepgp_loot:Top()
+  if T:IsRegistered("sepgp_loot") and (T.registry.sepgp_loot.tooltip) then
+    T.registry.sepgp_loot.tooltip.scroll=0
+  end  
+end
+
 function sepgp_loot:Toggle(forceShow)
+  self:Top()
   if T:IsAttached("sepgp_loot") then
     T:Detach("sepgp_loot")
     if (T:IsLocked("sepgp_loot")) then

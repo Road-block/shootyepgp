@@ -22,24 +22,6 @@ sepgp.VARS = {
   bankde = "Bank-D/E",
   reminder = C:Red("Unassigned"),
 }
-sepgp.cmdtable = {type = "group", handler = sepgp, args = {
-  show = {
-    type = "execute",
-    name = "Standings",
-    desc = "Show Standings Table.",
-    func = function()
-      sepgp_standings:Toggle()
-    end,
-  },
-  restart = {
-    type = "execute",
-    name = "Restart",
-    desc = "Restart shootyepgp if having startup problems.",
-    func = function() 
-      sepgp:OnEnable()
-    end,
-  },
-}}
 sepgp._playerName = (UnitName("player"))
 local shooty_reservechan = "Reserves"
 local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
@@ -68,7 +50,73 @@ do
     hexColorQuality[ITEM_QUALITY_COLORS[i].hex] = i
   end
 end
-
+local admincmd, membercmd = {type = "group", handler = sepgp, args = {
+    bids = {
+      type = "execute",
+      name = "Bids",
+      desc = "Show Bids Table.",
+      func = function()
+        sepgp_bids:Toggle()
+      end,
+    },
+    clearloot = {
+      type = "execute",
+      name = "ClearLoot",
+      desc = "Clear Loot Table.",
+      func = function()
+        sepgp_looted = {}
+      end,
+    },
+    clearlogs = {
+      type = "execute",
+      name = "ClearLogs",
+      desc = "Clear Logs Table.",
+      func = function()
+        sepgp_log = {}
+      end,
+    },
+    show = {
+      type = "execute",
+      name = "Standings",
+      desc = "Show Standings Table.",
+      func = function()
+        sepgp_standings:Toggle()
+      end,
+    },
+    restart = {
+      type = "execute",
+      name = "Restart",
+      desc = "Restart shootyepgp if having startup problems.",
+      func = function() 
+        sepgp:OnEnable()
+      end,
+    },
+  }},
+{type = "group", handler = sepgp, args = {
+    show = {
+      type = "execute",
+      name = "Standings",
+      desc = "Show Standings Table.",
+      func = function()
+        sepgp_standings:Toggle()
+      end,
+    },
+  }}
+  --[[{
+    type = "execute",
+    name = "Standings",
+    desc = "Show Standings Table.",
+    func = function()
+      sepgp_standings:Toggle()
+    end,
+  }]]  
+sepgp.cmdtable = function() 
+  if (admin()) then
+    return admincmd
+  else
+    return membercmd
+  end
+end
 sepgp.reserves = {}
 sepgp.bids_main,sepgp.bids_off,sepgp.bid_item = {},{},{}
 sepgp.timer = CreateFrame("Frame")
@@ -183,7 +231,7 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   for i=1,5 do
     table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
   end
-  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable)
+  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
   self._hasInitFull = true
 end
 

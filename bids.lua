@@ -55,7 +55,14 @@ function sepgp_bids:setHideScript()
   end
 end
 
+function sepgp_bids:Top()
+  if T:IsRegistered("sepgp_bids") and (T.registry.sepgp_bids.tooltip) then
+    T.registry.sepgp_bids.tooltip.scroll=0
+  end  
+end
+
 function sepgp_bids:Toggle(forceShow)
+  self:Top()
   if T:IsAttached("sepgp_bids") then
     T:Detach("sepgp_bids")
     if (T:IsLocked("sepgp_bids")) then

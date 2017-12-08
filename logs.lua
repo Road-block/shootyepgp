@@ -60,7 +60,14 @@ function sepgp_logs:setHideScript()
   end
 end
 
+function sepgp_logs:Top()
+  if T:IsRegistered("sepgp_logs") and (T.registry.sepgp_logs.tooltip) then
+    T.registry.sepgp_logs.tooltip.scroll=0
+  end  
+end
+
 function sepgp_logs:Toggle(forceShow)
+  self:Top()
   if T:IsAttached("sepgp_logs") then
     T:Detach("sepgp_logs")
     if (T:IsLocked("sepgp_logs")) then

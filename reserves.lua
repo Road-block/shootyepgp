@@ -55,7 +55,14 @@ function sepgp_reserves:setHideScript()
   end
 end
 
+function sepgp_reserves:Top()
+  if T:IsRegistered("sepgp_reserves") and (T.registry.sepgp_reserves.tooltip) then
+    T.registry.sepgp_reserves.tooltip.scroll=0
+  end  
+end
+
 function sepgp_reserves:Toggle(forceShow)
+  self:Top()
   if T:IsAttached("sepgp_reserves") then
     T:Detach("sepgp_reserves")
     if (T:IsLocked("sepgp_reserves")) then
