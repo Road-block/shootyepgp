@@ -18,7 +18,7 @@ Creating a new chatframe (right-click > create new window on chat tab) and namin
 ## usage
 Right-click on minimap or FuBar shootyepgp icon will show all available settings.  
 Left-click shows the standings window with everyone's EP, GP and PR values. 
-The standings window can also be toggled with **/shooty** chat command. 
+The standings window can also be toggled with **/shooty show** chat command. 
 
 ## features
 - EPGP standings list (all)
