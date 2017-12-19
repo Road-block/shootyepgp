@@ -14,6 +14,8 @@ sepgp.VARS = {
   timeout = 60,
   maxloglines = 500,
   prefix = "SEPGP_PREFIX",
+  reservechan = "Reserves",
+  reserveanswer = "^(%+)(%a*)$",
   bop = C:Red("BoP"),
   boe = C:Yellow("BoE"),
   nobind = C:White("NoBind"),
@@ -22,11 +24,10 @@ sepgp.VARS = {
   bankde = "Bank-D/E",
   reminder = C:Red("Unassigned"),
 }
+sepgp.VARS.reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
 sepgp._playerName = (UnitName("player"))
-local shooty_reservechan = "Reserves"
-local shooty_reservecall = string.format("{shootyepgp}Type \"+\" if on main, or \"+<YourMainName>\" (without quotes) if on alt within %dsec.",sepgp.VARS.timeout)
-local shooty_reserveanswer = "^(%+)(%a*)$"
 local out = "|cff9664c8shootyepgp:|r %s"
+local raidStatus,lastRaidStatus
 local lastUpdate = 0
 local needInit,needRefresh = true
 local admin,sanitizeNote
@@ -142,17 +143,20 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   sepgp.extratip = (sepgp.extratip) or CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
   self:RegisterEvent("GUILD_ROSTER_UPDATE",function() 
       if (arg1) then -- member join /leave
-        self:SetRefresh(true)
+        sepgp:SetRefresh(true)
       end
     end)
   self:RegisterEvent("RAID_ROSTER_UPDATE",function()
-      self:SetRefresh(true)
+      sepgp:SetRefresh(true)
+      sepgp:testLootPrompt()
     end)
   self:RegisterEvent("PARTY_MEMBERS_CHANGED",function()
-      self:SetRefresh(true)
+      sepgp:SetRefresh(true)
+      sepgp:testLootPrompt()
     end)
   self:RegisterEvent("PLAYER_ENTERING_WORLD",function()
-      self:SetRefresh(true)
+      sepgp:SetRefresh(true)
+      sepgp:testLootPrompt()
     end)
   self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
@@ -307,7 +311,7 @@ function sepgp:delayedInit()
       sepgp_reservechannel = string.format("%sReserves",(string.gsub(guildName," ","")))
     end
   end
-  if sepgp_reservechannel == nil then sepgp_reservechannel = shooty_reservechan end  
+  if sepgp_reservechannel == nil then sepgp_reservechannel = sepgp.VARS.reservechan end  
   local reservesChannelID = tonumber((GetChannelName(sepgp_reservechannel)))
   if (reservesChannelID) and (reservesChannelID ~= 0) then
     self:reservesToggle(true)
@@ -1349,7 +1353,7 @@ function sepgp:afkcheck_reserves()
     running_check = true
     sepgp.timer.count_down = sepgp.VARS.timeout
     sepgp.timer:Show()
-    SendChatMessage(shooty_reservecall,"CHANNEL",nil,sepgp.reservesChannelID)
+    SendChatMessage(sepgp.VARS.reservecall,"CHANNEL",nil,sepgp.reservesChannelID)
     sepgp_reserves:Toggle(true)
   end
 end
@@ -1369,7 +1373,7 @@ end
 function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
   if not (channel) or not (channel == sepgp_reservechannel) then return end
   local reserve, reserve_class, reserve_rank, reserve_alt = nil,nil,nil,nil
-  local r,_,rdy,name = string.find(text,shooty_reserveanswer)
+  local r,_,rdy,name = string.find(text,sepgp.VARS.reserveanswer)
   if (r) and (running_check) then
     if (rdy) then
       if (name) and (name ~= "") then
@@ -1681,6 +1685,21 @@ function sepgp:addOrUpdateLoot(data,update)
   end
 end
 
+function sepgp:testLootPrompt()
+  raidStatus = UnitInRaid("player") and true or false
+  if lastRaidStatus == nil then
+    lastRaidStatus = raidStatus
+  end
+  if (raidStatus == false) and (lastRaidStatus == true) then
+    local hasLoot = table.getn(sepgp_looted)
+    local dialog = StaticPopup_FindVisible("SHOOTY_EPGP_CLEAR_LOOT")
+    if (not (dialog)) and (hasLoot > 0) then
+      StaticPopup_Show("SHOOTY_EPGP_CLEAR_LOOT",hasLoot)
+    end
+  end
+  lastRaidStatus = raidStatus
+end
+
 ------------
 -- Logging
 ------------
@@ -1839,7 +1858,25 @@ end
 -------------
 -- Dialogs
 -------------
-
+StaticPopupDialogs["SHOOTY_EPGP_CLEAR_LOOT"] = {
+  text = "There are %d loot drops stored. It is recommended to clear loot info before a new raid. Do you want to clear it now?",
+  button1 = TEXT(YES),
+  button2 = "Show me",
+  OnAccept = function()
+    sepgp_looted = {}
+    sepgp:defaultPrint("Loot info cleared")
+  end,
+  OnCancel = function(_,reason)
+    if reason == "clicked" then
+      sepgp_loot:Toggle(true)
+      sepgp:defaultPrint("Loot info can be cleared at any time from the Tablet context menu or '/shooty clearloot' command")
+    end
+  end,
+  timeout = 0,
+  whileDead = 1,
+  exclusive = 0,
+  hideOnEscape = 1
+}
 StaticPopupDialogs["SHOOTY_EPGP_SET_MAIN"] = {
   text = "Set your main to be able to participate in Reserve List EPGP Checks.",
   button1 = TEXT(ACCEPT),
@@ -1979,7 +2016,7 @@ StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
   end,
   timeout = 0,
   exclusive = 1,
-  whileDead = 0,
+  whileDead = 1,
   hideOnEscape = 1
 }
 
@@ -2001,4 +2038,4 @@ function sepgp:EasyMenu_Initialize(level, menuList)
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs,sepgp_debug
