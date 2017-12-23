@@ -3,6 +3,7 @@ local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 
 sepgp_loot = sepgp:NewModule("sepgp_loot", "AceDB-2.0")
 
@@ -10,7 +11,7 @@ function sepgp_loot:OnEnable()
   if not T:IsRegistered("sepgp_loot") then
     T:Register("sepgp_loot",
       "children", function()
-        T:SetTitle("shootyepgp loot info")
+        T:SetTitle(L["shootyepgp loot info"])
         self:OnTooltipUpdate()
       end,
       "showTitleWhenDetached", true,
@@ -18,13 +19,13 @@ function sepgp_loot:OnEnable()
       "cantAttach", true,
       "menu", function()
         D:AddLine(
-          "text", "Refresh",
-          "tooltipText", "Refresh window",
+          "text", L["Refresh"],
+          "tooltipText", L["Refresh window"],
           "func", function() sepgp_loot:Refresh() end
         )
         D:AddLine(
-          "text", "Clear",
-          "tooltipText", "Clear Loot.",
+          "text", L["Clear"],
+          "tooltipText", L["Clear Loot."],
           "func", function() sepgp_looted = {} sepgp_loot:Refresh() end
         )        
       end      
@@ -96,11 +97,11 @@ end
 function sepgp_loot:OnTooltipUpdate()
   local cat = T:AddCategory(
       "columns", 5,
-      "text",  C:Orange("Time"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
-      "text2", C:Orange("Item"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   0, "child_justify2", "LEFT",
-      "text3", C:Orange("Binds"),  "child_text3R",   0, "child_text3G",   1, "child_text3B",   0, "child_justify3", "CENTER",
-      "text4", C:Orange("Looter"),  "child_text4R",   0, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT",
-      "text5", C:Orange("GP Action"),  "child_text5R",   0, "child_text5G",   1, "child_text5B",   0, "child_justify5", "RIGHT"         
+      "text",  C:Orange(L["Time"]),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
+      "text2", C:Orange(L["Item"]),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   0, "child_justify2", "LEFT",
+      "text3", C:Orange(L["Binds"]),  "child_text3R",   0, "child_text3G",   1, "child_text3B",   0, "child_justify3", "CENTER",
+      "text4", C:Orange(L["Looter"]),  "child_text4R",   0, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT",
+      "text5", C:Orange(L["GP Action"]),  "child_text5R",   0, "child_text5G",   1, "child_text5B",   0, "child_justify5", "RIGHT"         
     )
   local t = self:BuildLootTable()
   for i = 1, table.getn(t) do

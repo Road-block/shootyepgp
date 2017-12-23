@@ -2,6 +2,7 @@ local T = AceLibrary("Tablet-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
 local CP = AceLibrary("Compost-2.0")
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 
 sepgp_logs = sepgp:NewModule("sepgp_logs", "AceDB-2.0")
 sepgp_logs.tmp = CP:Acquire()
@@ -10,7 +11,7 @@ function sepgp_logs:OnEnable()
   if not T:IsRegistered("sepgp_logs") then
     T:Register("sepgp_logs",
       "children", function()
-        T:SetTitle("shootyepgp logs")
+        T:SetTitle(L["shootyepgp logs"])
         self:OnTooltipUpdate()
       end,
       "showTitleWhenDetached", true,
@@ -18,13 +19,13 @@ function sepgp_logs:OnEnable()
       "cantAttach", true,
       "menu", function()
         D:AddLine(
-          "text", "Refresh",
-          "tooltipText", "Refresh window",
+          "text", L["Refresh"],
+          "tooltipText", L["Refresh window"],
           "func", function() sepgp_logs:Refresh() end
         )
         D:AddLine(
-          "text", "Clear",
-          "tooltipText", "Clear Logs.",
+          "text", L["Clear"],
+          "tooltipText", L["Clear Logs."],
           "func", function() sepgp_log = {} sepgp_logs:Refresh() end
         )
       end      
@@ -103,8 +104,8 @@ end
 function sepgp_logs:OnTooltipUpdate()
   local cat = T:AddCategory(
       "columns", 2,
-      "text",  C:Orange("Time"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
-      "text2", C:Orange("Action"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT"
+      "text",  C:Orange(L["Time"]),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
+      "text2", C:Orange(L["Action"]),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT"
     )
   local t = sepgp_logs:BuildLogsTable()
   for i = 1, table.getn(t) do

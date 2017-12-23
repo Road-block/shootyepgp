@@ -3,6 +3,7 @@ local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 
 sepgp_standings = sepgp:NewModule("sepgp_standings", "AceDB-2.0")
 local shooty_export = CreateFrame("Frame", "shooty_exportframe", UIParent)
@@ -30,7 +31,7 @@ shooty_export.action:Hide()
 shooty_export.action:SetScript("OnClick",function() sepgp_standings.import() end)
 shooty_export.title = shooty_export:CreateFontString(nil,"OVERLAY")
 shooty_export.title:SetPoint("TOP",0,-5)
-shooty_export.title:SetFont("Fonts\\FRIZQT__.TTF", 12)
+shooty_export.title:SetFont("Fonts\\ARIALN.TTF", 12)
 shooty_export.title:SetWidth(200)
 shooty_export.title:SetJustifyH("LEFT")
 shooty_export.title:SetJustifyV("CENTER")
@@ -66,7 +67,7 @@ table.insert(UISpecialFrames,"shooty_exportframe")
 
 function sepgp_standings:Export()
   shooty_export.action:Hide()
-  shooty_export.title:SetText(C:Gold("Ctrl-C to copy. Esc to close."))
+  shooty_export.title:SetText(C:Gold(L["Ctrl-C to copy. Esc to close."]))
   local t = {}
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
@@ -91,12 +92,7 @@ function sepgp_standings:Import()
   if not IsGuildLeader() then return end
   shooty_export.action:Show()
   shooty_export.title:SetText(C:Red("Ctrl-V to paste data. Esc to close."))
-  shooty_export.AddSelectText([[Warning: 
-Import overwrites all existing EPGP values.
-
-Paste all the csv data here replacing this text, 
-then hit Import.
-Results will print here when done.]])
+  shooty_export.AddSelectText(L.IMPORT_WARNING)
   shooty_export:Show()
 end
 
@@ -126,9 +122,9 @@ function sepgp_standings.import()
         t[name]=nil
       end
     end
-    sepgp:defaultPrint(string.format("Imported %d members.",count))
-    local report = string.format("Imported %d members.\n",count)
-    report = string.format("%s\nFailed to import:",report)
+    sepgp:defaultPrint(string.format(L["Imported %d members."],count))
+    local report = string.format(L["Imported %d members.\n"],count)
+    report = string.format(L["%s\nFailed to import:"],report)
     for name,epgp in pairs(t) do
       report = string.format("%s%s {%s:%s}\n",report,name,t[1],t[2])
     end
@@ -140,7 +136,7 @@ function sepgp_standings:OnEnable()
   if not T:IsRegistered("sepgp_standings") then
     T:Register("sepgp_standings",
       "children", function()
-        T:SetTitle("shootyepgp standings")
+        T:SetTitle(L["shootyepgp standings"])
         self:OnTooltipUpdate()
       end,
   		"showTitleWhenDetached", true,
@@ -148,31 +144,31 @@ function sepgp_standings:OnEnable()
   		"cantAttach", true,
   		"menu", function()
         D:AddLine(
-          "text", "Raid Only",
-          "tooltipText", "Only show members in raid.",
+          "text", L["Raid Only"],
+          "tooltipText", L["Only show members in raid."],
           "checked", sepgp_raidonly,
           "func", function() sepgp_standings:ToggleRaidOnly() end
         )      
         D:AddLine(
-          "text", "Group by class",
-          "tooltipText", "Group members by class.",
+          "text", L["Group by class"],
+          "tooltipText", L["Group members by class."],
           "checked", sepgp_groupbyclass,
           "func", function() sepgp_standings:ToggleGroupByClass() end
         )
         D:AddLine(
-          "text", "Refresh",
-          "tooltipText", "Refresh window",
+          "text", L["Refresh"],
+          "tooltipText", L["Refresh window"],
           "func", function() sepgp_standings:Refresh() end
         )
         D:AddLine(
-          "text", "Export",
-          "tooltipText", "Export standings to csv.",
+          "text", L["Export"],
+          "tooltipText", L["Export standings to csv."],
           "func", function() sepgp_standings:Export() end
         )
         if IsGuildLeader() then
           D:AddLine(
-          "text", "Import",
-          "tooltipText", "Import standings from csv.",
+          "text", L["Import"],
+          "tooltipText", L["Import standings from csv."],
           "func", function() sepgp_standings:Import() end
         )
         end
@@ -281,10 +277,10 @@ end
 function sepgp_standings:OnTooltipUpdate()
   local cat = T:AddCategory(
       "columns", 4,
-      "text",  C:Orange("Name"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
-      "text2", C:Orange("ep"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT",
-      "text3", C:Orange("gp"),     "child_text3R",   1, "child_text3G",   1, "child_text3B",   1, "child_justify3", "RIGHT",
-      "text4", C:Orange("pr"),     "child_text4R",   1, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT"
+      "text",  C:Orange(L["Name"]),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
+      "text2", C:Orange(L["ep"]),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT",
+      "text3", C:Orange(L["gp"]),     "child_text3R",   1, "child_text3G",   1, "child_text3B",   1, "child_justify3", "RIGHT",
+      "text4", C:Orange(L["pr"]),     "child_text4R",   1, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT"
     )
   local t = self:BuildStandingsTable()
   for i = 1, table.getn(t) do

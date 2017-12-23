@@ -1,3 +1,4 @@
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 function sepgp:v2tov3()
   local count = 0
   for i = 1, GetNumGuildMembers(1) do
@@ -14,7 +15,7 @@ function sepgp:v2tov3()
       sepgp:update_epgp_v3(epv2,gpv2,i,name,officernote)
     end
   end
-  self:defaultPrint(string.format("Updated %d members to v3 storage.",count))
+  self:defaultPrint(string.format(L["Updated %d members to v3 storage."],count))
   sepgp_dbver = 3
 end
 

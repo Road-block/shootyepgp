@@ -1,12 +1,14 @@
 ## Interface: 11200
 ## Title: shootyepgp
+## Title-zhCN: shootyepgp EPGP插件 V2.1
 ## Notes: Effort Points/Gear Points Loot System
+## Notes-zhCN: 努力点/齿轮点拾取系统
 ## Author: Roadblock
 ## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
 ## X-Category: Guild
-## X-Credits: shooty
+## X-Credits: shooty,Qcat(zhCN)
 ## Version: 3.31
-## X-Alpha: 
+## X-Alpha: 3.31.1
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_raidonly, sepgp_dbver, sepgp_debug
 ## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount
@@ -32,6 +34,7 @@ Libs\Tablet-2.0\Tablet-2.0.lua
 Libs\Gratuity-2.0\Gratuity-2.0.lua
 Libs\FuBarPlugin-2.0\FuBarPlugin-2.0.lua
 
+localization.lua
 shootyepgp.lua
 migrations.lua
 prices.lua

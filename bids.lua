@@ -3,6 +3,7 @@ local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 
 sepgp_bids = sepgp:NewModule("sepgp_bids", "AceDB-2.0", "AceEvent-2.0")
 
@@ -10,7 +11,7 @@ function sepgp_bids:OnEnable()
   if not T:IsRegistered("sepgp_bids") then
     T:Register("sepgp_bids",
       "children", function()
-        T:SetTitle("shootyepgp bids")
+        T:SetTitle(L["shootyepgp bids"])
         self:OnTooltipUpdate()
       end,
       "showTitleWhenDetached", true,
@@ -18,8 +19,8 @@ function sepgp_bids:OnEnable()
       "cantAttach", true,
       "menu", function()
         D:AddLine(
-          "text", "Refresh",
-          "tooltipText", "Refresh window",
+          "text", L["Refresh"],
+          "tooltipText", L["Refresh window"],
           "func", function() sepgp_bids:Refresh() end
         )
       end      
@@ -77,17 +78,11 @@ function sepgp_bids:Toggle(forceShow)
 end
 
 function sepgp_bids:announceWinnerMS(name, pr)
-  --if GetNumRaidMembers()>0 then
-  sepgp:widestAudience(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr))
-  --SendChatMessage(string.format("Winning Mainspec Bid: %s (%.03f PR)",name,pr),"RAID")
-  --end
+  sepgp:widestAudience(string.format(L["Winning Mainspec Bid: %s (%.03f PR)"],name,pr))
 end
 
 function sepgp_bids:announceWinnerOS(name, pr)
-  --if GetNumRaidMembers()>0 then
-  sepgp:widestAudience(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr))
-  --SendChatMessage(string.format("Winning Offspec Bid: %s (%.03f PR)",name,pr),"RAID")
-  --end
+  sepgp:widestAudience(string.format(L["Winning Offspec Bid: %s (%.03f PR)"],name,pr))
 end
 
 function sepgp_bids:countdownCounter()

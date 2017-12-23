@@ -3,6 +3,7 @@ local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
+local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 
 sepgp_reserves = sepgp:NewModule("sepgp_reserves", "AceDB-2.0")
 
@@ -10,7 +11,7 @@ function sepgp_reserves:OnEnable()
   if not T:IsRegistered("sepgp_reserves") then
     T:Register("sepgp_reserves",
       "children", function()
-        T:SetTitle("shootyepgp reserves")
+        T:SetTitle(L["shootyepgp reserves"])
         self:OnTooltipUpdate()
       end,
       "showTitleWhenDetached", true,
@@ -18,8 +19,8 @@ function sepgp_reserves:OnEnable()
       "cantAttach", true,
       "menu", function()
         D:AddLine(
-          "text", "Refresh",
-          "tooltipText", "Refresh window",
+          "text", L["Refresh"],
+          "tooltipText", L["Refresh window"],
           "func", function() sepgp_reserves:Refresh() end
         )
       end      
@@ -94,14 +95,14 @@ function sepgp_reserves:OnTooltipUpdate()
       "columns", 2
     )
   cdcat:AddLine(
-      "text", C:Orange("Countdown"),
+      "text", C:Orange(L["Countdown"]),
       "text2", sepgp.timer.cd_text
     )
   local cat = T:AddCategory(
       "columns", 3,
-      "text",  C:Orange("Name"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
-      "text2", C:Orange("Rank"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   0, "child_justify2", "RIGHT",
-      "text3", C:Orange("OnAlt"),  "child_text3R",   0, "child_text3G",   1, "child_text3B",   0, "child_justify3", "RIGHT"
+      "text",  C:Orange(L["Name"]),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
+      "text2", C:Orange(L["Rank"]),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   0, "child_justify2", "RIGHT",
+      "text3", C:Orange(L["OnAlt"]),  "child_text3R",   0, "child_text3G",   1, "child_text3B",   0, "child_justify3", "RIGHT"
     )
   local t = self:BuildReservesTable()
   for i = 1, table.getn(t) do
