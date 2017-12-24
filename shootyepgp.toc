@@ -1,14 +1,14 @@
 ## Interface: 11200
 ## Title: shootyepgp
-## Title-zhCN: shootyepgp EPGP插件 V2.1
+## Title-zhCN: shootyepgp EPGP插件
 ## Notes: Effort Points/Gear Points Loot System
-## Notes-zhCN: 努力点/齿轮点拾取系统
+## Notes-zhCN: 贡献点/装备点拾取制度系统
 ## Author: Roadblock
 ## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
 ## X-Category: Guild
 ## X-Credits: shooty,Qcat(zhCN)
-## Version: 3.31
-## X-Alpha: 3.31.1
+## Version: 3.31.1
+## X-Alpha: 
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_raidonly, sepgp_dbver, sepgp_debug
 ## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount
