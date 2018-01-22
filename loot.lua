@@ -91,7 +91,7 @@ function sepgp_loot:BuildLootTable()
 end
 
 function sepgp_loot:OnClickItem(data)
-
+  
 end
 
 function sepgp_loot:OnTooltipUpdate()

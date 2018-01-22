@@ -1,3 +1,12 @@
+--[[
+TODO
+1. Add EP / GP Menu to raid unit context menu and loot info window.
+2. Figure out a way to pool EPGP for multiple characters.
+High risk of abuse though .. 
+One approach is have officer notes on alts contain the main name,
+that at least limits the risk to officers exploiting.
+Both EP and GP should transfer to main points, no earning without spending.
+]]
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
 sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
@@ -455,7 +464,11 @@ end
 function sepgp:LootFrameItem_OnClick(button,data)
   if not IsAltKeyDown() then return end
   if not UnitInRaid("player") then return end
-  if not self:lootMaster() then return end
+  if not (self:lootMaster()) then 
+    self:defaultPrint("Need MasterLooter to perform Bid Calls!")
+    UIErrorsFrame:AddMessage("Need MasterLooter to perform Bid Calls!",1,0,0)
+    return 
+  end
   local slot, quality
   if data ~= nil then
     slot,quality = data:GetID(), data.quality
@@ -488,7 +501,9 @@ function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
   if not UnitInRaid("player") then 
     return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
   end
-  if not self:lootMaster() then 
+  if not (self:lootMaster()) then
+    self:defaultPrint("Need MasterLooter to perform Bid Calls!")
+    UIErrorsFrame:AddMessage("Need MasterLooter to perform Bid Calls!",1,0,0)
     return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
   end
   if not (this._hasExtraClicks) then
@@ -985,7 +1000,7 @@ function sepgp:capcalc(ep,gp,gain)
   local ep_decayed = self:num_round(ep*sepgp_decay)
   local gp_decayed = math.max(sepgp.VARS.basegp,self:num_round(gp*sepgp_decay))
   local pr_decay = tonumber(string.format("%.03f",pr))-tonumber(string.format("%.03f",ep_decayed/gp_decayed))
-  if pr_decay < 0.01 then 
+  if (pr_decay < 0.1) then 
     pr_decay = 0 
   else
     pr_decay = -tonumber(string.format("%.02f",pr_decay))
@@ -1582,7 +1597,7 @@ function sepgp:captureLoot(message)
     local bind = self:itemBinding(itemString)
     if not (bind) then return end
     local price = sepgp_prices:GetPrice(itemString,sepgp_progress)
-    if not (price) or price == 0 then
+    if (not (price)) or (price == 0) then
       return
     end
     local class,_
@@ -1845,7 +1860,7 @@ function sepgp:parseVersion(version,otherVersion)
 end
 
 admin = function()
-  return (CanEditOfficerNote() and CanEditPublicNote())
+  return (CanEditOfficerNote() --[[and CanEditPublicNote()]])
 end
 
 sanitizeNote = function(prefix,epgp,postfix)
