@@ -465,8 +465,8 @@ function sepgp:LootFrameItem_OnClick(button,data)
   if not IsAltKeyDown() then return end
   if not UnitInRaid("player") then return end
   if not (self:lootMaster()) then 
-    self:defaultPrint("Need MasterLooter to perform Bid Calls!")
-    UIErrorsFrame:AddMessage("Need MasterLooter to perform Bid Calls!",1,0,0)
+    self:defaultPrint(L["Need MasterLooter to perform Bid Calls!"])
+    UIErrorsFrame:AddMessage(L["Need MasterLooter to perform Bid Calls!"],1,0,0)
     return 
   end
   local slot, quality
@@ -502,8 +502,8 @@ function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
     return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
   end
   if not (self:lootMaster()) then
-    self:defaultPrint("Need MasterLooter to perform Bid Calls!")
-    UIErrorsFrame:AddMessage("Need MasterLooter to perform Bid Calls!",1,0,0)
+    self:defaultPrint(L["Need MasterLooter to perform Bid Calls!"])
+    UIErrorsFrame:AddMessage(L["Need MasterLooter to perform Bid Calls!"],1,0,0)
     return self.hooks["ContainerFrameItemButton_OnClick"](button,ignoreModifiers) 
   end
   if not (this._hasExtraClicks) then

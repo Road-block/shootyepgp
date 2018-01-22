@@ -172,6 +172,7 @@ Results will print here when done.]],
   ["%s looted %s. What do you want to do?"] = true,
   ["GP Actions"] = true,
   ["Remind me Later"] = true,
+  ["Need MasterLooter to perform Bid Calls!"] = true,
 } end)
 
 L:RegisterTranslations("zhCN", function() return {
@@ -346,4 +347,5 @@ L:RegisterTranslations("zhCN", function() return {
   ["%s looted %s. What do you want to do?"] = "%s 拾取了 %s. 你想做什么？",
   ["GP Actions"] = "GP 操作",
   ["Remind me Later"] = "以后提醒我",
+  ["Need MasterLooter to perform Bid Calls!"] = "Need MasterLooter to perform Bid Calls!",
 } end)
