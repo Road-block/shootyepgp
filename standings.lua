@@ -71,8 +71,8 @@ function sepgp_standings:Export()
   local t = {}
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-    local ep = (sepgp:get_ep_v3(name,officernote) or 0) --DONE: update v3
-    local gp = (sepgp:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --DONE: update v3
+    local ep = (sepgp:get_ep_v3(name,officernote) or 0) 
+    local gp = (sepgp:get_gp_v3(name,officernote) or sepgp.VARS.basegp) 
     if ep > 0 then
       table.insert(t,{name,ep,gp,ep/gp})
     end
@@ -189,10 +189,11 @@ function sepgp_standings:Refresh()
 end
 
 function sepgp_standings:setHideScript()
-  local detachedFrame, tablet
-  for i=1,5 do
-    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
-    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_standings" then
+  local i = 1
+  local tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  while (tablet) and i<100 do
+    if tablet.owner ~= nil and tablet.owner == "sepgp_standings" then
+      sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
       if not (tablet:GetScript("OnHide")) then
         tablet:SetScript("OnHide",function()
             if not T:IsAttached("sepgp_standings") then
@@ -201,8 +202,11 @@ function sepgp_standings:setHideScript()
             end
           end)
       end
-    end
-  end
+      break
+    end    
+    i = i+1
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  end  
 end
 
 function sepgp_standings:Top()
@@ -211,17 +215,20 @@ function sepgp_standings:Top()
   end  
 end
 
-function sepgp_standings:Toggle()
+function sepgp_standings:Toggle(forceShow)
   self:Top()
   if T:IsAttached("sepgp_standings") then
-    T:Detach("sepgp_standings")
+    T:Detach("sepgp_standings") -- show
     if (T:IsLocked("sepgp_standings")) then
       T:ToggleLocked("sepgp_standings")
     end
     self:setHideScript()
+  elseif (forceShow) then
+    sepgp_standings:Refresh()
+    
   else
-    T:Attach("sepgp_standings")
-  end
+    T:Attach("sepgp_standings") -- hide
+  end  
 end
 
 function sepgp_standings:ToggleGroupByClass()
@@ -247,10 +254,23 @@ function sepgp_standings:BuildStandingsTable()
       r[name] = true
     end
   end
+  sepgp.alts = {}
   for i = 1, GetNumGuildMembers(1) do
     local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
-    local ep = (sepgp:get_ep_v3(name,officernote) or 0) --DONE: update v3
-    local gp = (sepgp:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --DONE: update v3
+    local ep = (sepgp:get_ep_v3(name,officernote) or 0) 
+    local gp = (sepgp:get_gp_v3(name,officernote) or sepgp.VARS.basegp)
+    local main, main_class, main_rank = sepgp:parseAlt(name,officernote)
+    if (main) then
+      if ((self._playerName) and (name == self._playerName)) then
+        if (not sepgp_main) or (sepgp_main and sepgp_main ~= main) then
+          sepgp_main = main
+          self:defaultPrint(L["Your main has been set to %s"],sepgp_main)
+        end
+      end
+      main = C:Colorize(BC:GetHexColor(main_class), main)
+      sepgp.alts[main] = sepgp.alts[main] or {}
+      sepgp.alts[main][name] = class
+    end    
     if ep > 0 then
       if (sepgp_raidonly) and next(r) then
         if r[name] then
@@ -289,7 +309,7 @@ function sepgp_standings:OnTooltipUpdate()
     local text2 = string.format("%.4g", ep)
     local text3 = string.format("%.4g", gp)    
     local text4 = string.format("%.4g", pr)
-    if (sepgp._playerName) and sepgp._playerName == name then
+    if ((sepgp._playerName) and sepgp._playerName == name) or ((sepgp_main) and sepgp_main == name) then
       text = string.format("(*)%s",text)
       local pr_decay = sepgp:capcalc(ep,gp)
       if pr_decay < 0 then
@@ -306,4 +326,4 @@ function sepgp_standings:OnTooltipUpdate()
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

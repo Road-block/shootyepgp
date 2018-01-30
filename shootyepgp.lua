@@ -1,12 +1,3 @@
---[[
-TODO
-1. Add EP / GP Menu to raid unit context menu and loot info window.
-2. Figure out a way to pool EPGP for multiple characters.
-High risk of abuse though .. 
-One approach is have officer notes on alts contain the main name,
-that at least limits the risk to officers exploiting.
-Both EP and GP should transfer to main points, no earning without spending.
-]]
 sepgp = AceLibrary("AceAddon-2.0"):new("AceConsole-2.0", "AceHook-2.1", "AceDB-2.0", "AceDebug-2.0", "AceEvent-2.0", "AceModuleCore-2.0", "FuBarPlugin-2.0")
 sepgp:SetModuleMixins("AceDebug-2.0")
 local D = AceLibrary("Dewdrop-2.0")
@@ -136,12 +127,15 @@ sepgp.timer:Hide()
 sepgp.timer:SetScript("OnUpdate",function() sepgp.OnUpdate(this,arg1) end)
 sepgp.timer:SetScript("OnEvent",function() 
 end)
+sepgp.alts = {}
 
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_saychannel == nil then sepgp_saychannel = "GUILD" end
   if sepgp_decay == nil then sepgp_decay = sepgp.VARS.decay end
   if sepgp_progress == nil then sepgp_progress = "T1" end
   if sepgp_discount == nil then sepgp_discount = 0.25 end
+  if sepgp_altspool == nil then sepgp_altspool = false end
+  if sepgp_altpercent == nil then sepgp_altpercent = 1.0 end
   if sepgp_log == nil then sepgp_log = {} end
   if sepgp_looted == nil then sepgp_looted = {} end
   if sepgp_debug == nil then sepgp_debug = {} end
@@ -151,6 +145,15 @@ end
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnEnable"})
   sepgp.extratip = (sepgp.extratip) or CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
+  sepgp._versionString = GetAddOnMetadata("shootyepgp","Version")
+  sepgp._websiteString = GetAddOnMetadata("shootyepgp","X-Website")
+  
+  if (IsInGuild()) then
+    if (GetNumGuildMembers()==0) then
+      GuildRoster()
+    end
+  end
+
   self:RegisterEvent("GUILD_ROSTER_UPDATE",function() 
       if (arg1) then -- member join /leave
         sepgp:SetRefresh(true)
@@ -176,12 +179,6 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   self:RegisterEvent("CHAT_MSG_LOOT","captureLoot")
   self:RegisterEvent("TRADE_PLAYER_ITEM_CHANGED","tradeLoot")
   self:RegisterEvent("TRADE_ACCEPT_UPDATE","tradeLoot")
-
-  if (IsInGuild()) then
-    if (GetNumGuildMembers()==0) then
-      GuildRoster()
-    end
-  end
 
   if AceLibrary("AceEvent-2.0"):IsFullyInitialized() then
     self:AceEvent_FullyInitialized()
@@ -242,8 +239,8 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
     self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
   end
   -- make tablets closable with ESC
-  for i=1,5 do
-    table.insert(UISpecialFrames,string.format("Tablet20DetachedFrame%d",i))
+  for i=1,6 do
+    self:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
   end
   self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
   self._hasInitFull = true
@@ -254,12 +251,16 @@ function sepgp:OnMenuRequest()
   local now = GetTime()
   if not self._lastRosterRequest or (now - self._lastRosterRequest > 2) then
     self._lastRosterRequest = now
+    self:SetRefresh(true)
     GuildRoster()
   end
   D:FeedAceOptionsTable(self:buildMenu())
 end
 
 function sepgp:TipHook()
+  self:SecureHook(GameTooltip, "SetHyperlink", function(this, itemstring)
+    sepgp:AddDataToTooltip(GameTooltip, nil, itemstring)
+  end)
   self:SecureHook(GameTooltip, "SetBagItem", function(this, bag, slot)
     local itemLink = GetContainerItemLink(bag, slot)
     local ml_tip
@@ -311,6 +312,15 @@ function sepgp:TipHook()
     self.hooks[ItemRefTooltip]["OnHide"]()
   end
   )
+  if (AtlasLootTooltip) then
+    self:SecureHook(AtlasLootTooltip, "SetHyperlink", function(this, itemstring)
+      sepgp:AddDataToTooltip(AtlasLootTooltip,nil,itemstring)
+    end)
+    self:HookScript(AtlasLootTooltip, "OnHide", function()
+      if sepgp.extratip:IsVisible() then sepgp.extratip:Hide() end
+      self.hooks[AtlasLootTooltip]["OnHide"]()
+    end)
+  end
 end
 
 function sepgp:delayedInit()
@@ -327,8 +337,6 @@ function sepgp:delayedInit()
     self:reservesToggle(true)
   end
   -- migrate EPGP storage if needed
-  sepgp._versionString = GetAddOnMetadata("shootyepgp","Version")
-  sepgp._websiteString = GetAddOnMetadata("shootyepgp","X-Website")
   self:parseVersion(sepgp._versionString)
   local major_ver = self._version.major
   if IsGuildLeader() and ( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
@@ -383,8 +391,13 @@ function sepgp:AddDataToTooltip(tooltip,itemlink,itemstring,is_master)
     sepgp.extratip:ClearLines()
     sepgp.extratip:SetOwner(tooltip,"ANCHOR_NONE")
     sepgp.extratip:ClearAllPoints()
-    sepgp.extratip:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", 0, -5)
-    --sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
+    if (EnhTooltip) and EnhancedTooltip:IsVisible() then
+      sepgp.extratip:SetPoint("BOTTOMLEFT", tooltip, "TOPLEFT", 0, 5)
+      sepgp.extratip:SetPoint("BOTTOMRIGHT", tooltip, "TOPRIGHT", 0, 5)          
+    else
+      sepgp.extratip:SetPoint("TOPLEFT", tooltip, "BOTTOMLEFT", 0, -5)
+      sepgp.extratip:SetPoint("TOPRIGHT", tooltip, "BOTTOMRIGHT", 0, -5)
+    end
     sepgp.extratip:SetText("|cff9664c8shootyepgp|r")
     sepgp.extratip:AddDoubleLine(" ",textRight)
     sepgp.extratip:AddDoubleLine(" ",textRight2)
@@ -419,6 +432,16 @@ function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
     local name, _, _, _, _, _, _, prevnote, _, _ = GetGuildRosterInfo(index)
     local _,_,_,oldepgp,_ = string.find(prevnote or "","(.*)({%d+:%d+})(.*)")
     local _,_,_,epgp,_ = string.find(note or "","(.*)({%d+:%d+})(.*)")
+    if (sepgp_altspool) then
+      local oldmain = self:parseAlt(name,prevnote)
+      local main = self:parseAlt(name,note)
+      if oldmain ~= nil then
+        if main == nil or main ~= oldmain then 
+          self:adminSay(string.format(L["Manually modified %s\'s note. Previous main was %s"],name,oldmain))
+          self:defaultPrint(string.format(L["|cffff0000Manually modified %s\'s note. Previous main was %s|r"],name,oldmain))
+        end
+      end
+    end    
     if oldepgp ~= nil then
       if epgp == nil or epgp ~= oldepgp then
         self:adminSay(string.format(L["Manually modified %s\'s note. EPGP was %s"],name,oldepgp))
@@ -426,7 +449,7 @@ function sepgp:GuildRosterSetOfficerNote(index,note,fromAddon)
       end
     end
     local safenote = string.gsub(note,"(.*)({%d+:%d+})(.*)",sanitizeNote)
-    self.hooks["GuildRosterSetOfficerNote"](index,safenote)    
+    return self.hooks["GuildRosterSetOfficerNote"](index,safenote)    
   end
 end
 
@@ -650,7 +673,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
   end
   if (who) and (what) and (amount) then
     local msg
-    if who == self._playerName then
+    if (who == self._playerName) or (sepgp_main and (who == sepgp_main)) then
       if what == "EP" then
         if amount < 0 then
           msg = string.format(L["You have received a %d EP penalty."],amount)
@@ -677,9 +700,11 @@ function sepgp:addonComms(prefix,message,channel,sender)
         self:shareSettings()
       end
     elseif who == "SETTINGS" then
-      for progress,discount,decay in string.gfind(what,"([^:]+):([^:]+):([^:]+)") do
+      for progress,discount,decay,alts,altspct in string.gfind(what,"([^:]+):([^:]+):([^:]+):([^:]+):([^:]+)") do
         discount = tonumber(discount)
         decay = tonumber(decay)
+        altspct = tonumber(altspct)
+        alts = (alts == "true") and true or false
         local settings_notice
         if progress and progress ~= sepgp_progress then
           sepgp_progress = progress
@@ -703,6 +728,26 @@ function sepgp:addonComms(prefix,message,channel,sender)
             end
           end
         end
+        if alts and alts ~= sepgp_altspool then
+          sepgp_altspool = alts
+          if (admin()) then
+            if (settings_notice) then
+              settings_notice = settings_notice..L[", alts"]
+            else
+              settings_notice = L["New Alts"]
+            end
+          end          
+        end
+        if altspct and altspct ~= sepgp_altpercent then
+          sepgp_altpercent = altspct
+          if (admin()) then
+            if (settings_notice) then
+              settings_notice = settings_notice..L[", alts ep %"]
+            else
+              settings_notice = L["New Alts EP %"]
+            end
+          end          
+        end
         if (settings_notice) and settings_notice ~= "" then
           local sender_rank = string.format("%s(%s)",C:Colorize(BC:GetHexColor(class),sender),rank)
           settings_notice = settings_notice..string.format(L[" settings accepted from %s"],sender_rank)
@@ -721,7 +766,7 @@ function sepgp:shareSettings(force)
   local now = GetTime()
   if self._lastSettingsShare == nil or (now - self._lastSettingsShare > 30) or (force) then
     self._lastSettingsShare = now
-    local addonMsg = string.format("SETTINGS;%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay)
+    local addonMsg = string.format("SETTINGS;%s:%s:%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay,tostring(sepgp_altspool),sepgp_altpercent)
     self:addonMessage(addonMsg,"GUILD")
   end
 end
@@ -897,11 +942,21 @@ end
 
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
   if not (admin()) then return end
-  local newep = ep + (self:get_ep_v3(getname) or 0) --DONE: update v3
-  self:update_ep_v3(getname,newep) --DONE: update v3
-  self:debugPrint(string.format(L["Giving %d ep to %s"],ep,getname))
+  local postfix, alt = ""
+  if (sepgp_altspool) then -- TODO: Main/Alt notification
+    local main = self:parseAlt(getname)
+    if (main) then
+      alt = getname
+      getname = main
+      ep = self:num_round(sepgp_altpercent*ep)
+      postfix = string.format(L[", %s\'s Main."],alt)
+    end
+  end
+  local newep = ep + (self:get_ep_v3(getname) or 0) 
+  self:update_ep_v3(getname,newep) 
+  self:debugPrint(string.format(L["Giving %d ep to %s%s."],ep,getname,postfix))
   if ep < 0 then -- inform admins and victim of penalties
-    local msg = string.format(L["%s EP Penalty to %s."],ep,getname)
+    local msg = string.format(L["%s EP Penalty to %s%s."],ep,getname,postfix)
     self:adminSay(msg)
     self:addToLog(msg)
     local addonMsg = string.format("%s;%s;%s",getname,"EP",ep)
@@ -911,11 +966,20 @@ end
 
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
   if not (admin()) then return end
-  local oldgp = (self:get_gp_v3(getname) or sepgp.VARS.basegp) --DONE: update v3
+  local postfix, alt = ""
+  if (sepgp_altspool) then -- TODO: Main/Alt notification
+    local main = self:parseAlt(getname)
+    if (main) then
+      alt = getname
+      getname = main
+      postfix = string.format(L[", %s\'s Main."],alt)
+    end
+  end
+  local oldgp = (self:get_gp_v3(getname) or sepgp.VARS.basegp) 
   local newgp = gp + oldgp
-  self:update_gp_v3(getname,newgp) --DONE: update v3
-  self:debugPrint(string.format(L["Giving %d gp to %s"],gp,getname))
-  local msg = string.format(L["Awarding %d GP to %s. (Previous: %d, New: %d)"],gp,getname,oldgp,math.max(sepgp.VARS.basegp,newgp))
+  self:update_gp_v3(getname,newgp) 
+  self:debugPrint(string.format(L["Giving %d gp to %s%s."],gp,getname,postfix))
+  local msg = string.format(L["Awarding %d GP to %s%s. (Previous: %d, New: %d)"],gp,getname,postfix,oldgp,math.max(sepgp.VARS.basegp,newgp))
   self:adminSay(msg)
   self:addToLog(msg)
   local addonMsg = string.format("%s;%s;%s",getname,"GP",gp)
@@ -1039,12 +1103,12 @@ local T = AceLibrary("Tablet-2.0")
 sepgp.defaultMinimapPosition = 180
 sepgp.cannotDetachTooltip = true
 sepgp.tooltipHiddenWhenEmpty = false
-sepgp.hasIcon = "Interface\\Icons\\INV_Misc_Orb_04"
+sepgp.hasIcon = "Interface\\PetitionFrame\\GuildCharter-Icon"
 
 function sepgp:OnTooltipUpdate()
   local hint = L["|cffffff00Click|r to toggle Standings.%s \n|cffffff00Right-Click|r for Options."]
   if (admin()) then
-    hint = string.format(hint,L[" \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Shift+Click|r to toggle Loot. \n|cffffff00Ctrl+Shift+Click|r to toggle Logs."])
+    hint = string.format(hint,L[" \n|cffffff00Ctrl+Click|r to toggle Reserves. \n|cffffff00Alt+Click|r to toggle Bids. \n|cffffff00Shift+Click|r to toggle Loot. \n|cffffff00Ctrl+Alt+Click|r to toggle Alts. \n|cffffff00Ctrl+Shift+Click|r to toggle Logs."])
   else
     hint = string.format(hint,"")
   end
@@ -1055,6 +1119,8 @@ function sepgp:OnClick()
   local is_admin = admin()
   if (IsControlKeyDown() and IsShiftKeyDown() and is_admin) then
     sepgp_logs:Toggle()
+  elseif (IsControlKeyDown() and IsAltKeyDown() and is_admin) then
+    sepgp_alts:Toggle()
   elseif (IsControlKeyDown() and is_admin) then
     sepgp_reserves:Toggle()
   elseif (IsShiftKeyDown() and is_admin) then
@@ -1082,8 +1148,21 @@ function sepgp:buildRosterTable()
       r[name] = true
     end
   end
+  sepgp.alts = {}
   for i = 1, numGuildMembers do
-    local member_name,_,_,_,class,_,ep,gp,_,_ = GetGuildRosterInfo(i)
+    local member_name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
+    local main, main_class, main_rank = self:parseAlt(member_name,officernote)
+    if (main) then
+      if ((self._playerName) and (name == self._playerName)) then
+        if (not sepgp_main) or (sepgp_main and sepgp_main ~= main) then
+          sepgp_main = main
+          self:defaultPrint(L["Your main has been set to %s"],sepgp_main)
+        end
+      end
+      main = C:Colorize(BC:GetHexColor(main_class), main)
+      sepgp.alts[main] = sepgp.alts[main] or {}
+      sepgp.alts[main][member_name] = class
+    end
     if (sepgp_raidonly) and next(r) then
       if r[member_name] then
         table.insert(g,{["name"]=member_name,["class"]=class})
@@ -1202,6 +1281,40 @@ function sepgp:buildMenu()
       hidden = function() return not (admin()) end,
       func = function() sepgp:afkcheck_reserves() end
     }
+    options.args["alts"] = {
+      type = "toggle",
+      name = L["Enable Alts"],
+      desc = L["Allow Alts to use Main\'s EPGP."],
+      order = 63,
+      hidden = function() return not (admin()) end,
+      disabled = function() return not (IsGuildLeader()) end,
+      get = function() return not not sepgp_altspool end,
+      set = function(v) 
+        sepgp_altspool = not sepgp_altspool
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+    }
+    options.args["alts_percent"] = {
+      type = "range",
+      name = L["Alts EP %"],
+      desc = L["Set the % EP Alts can earn."],
+      order = 66,
+      hidden = function() return not (admin()) end,
+      disabled = function() return not sepgp_altspool end,
+      get = function() return sepgp_altpercent end,
+      set = function(v) 
+        sepgp_altpercent = v
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+      min = 0.5,
+      max = 1,
+      step = 0.05,
+      isPercent = true
+    }
     options.args["set_main"] = {
       type = "text",
       name = L["Set Main"],
@@ -1253,7 +1366,7 @@ function sepgp:buildMenu()
       desc = string.format(L["Decays all EPGP by %s%%"],(1-(sepgp_decay or sepgp.VARS.decay))*100),
       order = 100,
       hidden = function() return not (admin()) end,
-      func = function() sepgp:decay_epgp_v3() end --DONE: update v3
+      func = function() sepgp:decay_epgp_v3() end 
     }    
     options.args["set_decay"] = {
       type = "range",
@@ -1312,6 +1425,35 @@ function sepgp:buildMenu()
   end
   return options
 end
+
+---------------
+-- Alts
+---------------
+function sepgp:parseAlt(name,officernote)
+  if (officernote) then
+    local _,_,_,main,_ = string.find(officernote or "","(.*){([%a][%a]%a*)}(.*)")
+    if type(main)=="string" and (string.len(main) < 13) then
+      main = self:camelCase(main)
+      local g_name, g_class, g_rank, g_officernote = self:verifyGuildMember(main)
+      if (g_name) then
+        return g_name, g_class, g_rank, g_officernote
+      else
+        return nil
+      end
+    else
+      return nil
+    end
+  else
+    for i=1,GetNumGuildMembers(1) do
+      local g_name, _, _, _, g_class, _, g_note, g_officernote, _, _ = GetGuildRosterInfo(i)
+      if (name == g_name) then
+        return self:parseAlt(g_name, g_officernote)
+      end
+    end
+  end
+  return nil
+end
+
 
 ---------------
 -- Reserves
@@ -1426,7 +1568,7 @@ function sepgp:captureReserveChatter(text, sender, _, _, _, _, _, _, channel)
   end
   local q = string.find(text,L["^{shootyepgp}Type"])
   if (q) and not (running_check) then
-    if (not UnitInRaid("player")) or (not self:inRaid(sender)) then
+    if --[[(not UnitInRaid("player")) or]] (not self:inRaid(sender)) then
       StaticPopup_Show("SHOOTY_EPGP_RESERVE_AFKCHECK_RESPONCE")
     end
   end
@@ -1524,14 +1666,31 @@ function sepgp:captureBid(text, sender)
         for i = 1, GetNumGuildMembers(1) do
           local name, _, _, _, class, _, note, officernote, _, _ = GetGuildRosterInfo(i)
           if name == sender then
-            local ep = (self:get_ep_v3(name,officernote) or 0) --DONE: update v3
-            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp) --DONE: update v3
+            local ep = (self:get_ep_v3(name,officernote) or 0) 
+            local gp = (self:get_gp_v3(name,officernote) or sepgp.VARS.basegp)
+            local main_name
+            if (sepgp_altspool) then
+              local main, main_class, main_rank, main_offnote = self:parseAlt(name,officernote)
+              if (main) then
+                ep = (self:get_ep_v3(main,main_offnote) or 0)
+                gp = (self:get_gp_v3(main,main_offnote) or sepgp.VARS.basegp)
+                main_name = main
+              end
+            end
             if (mskw_found) then
               bids_blacklist[sender] = true
-              table.insert(sepgp.bids_main,{name,class,ep,gp,ep/gp})
+              if (sepgp_altspool) and (main_name) then
+                table.insert(sepgp.bids_main,{name,class,ep,gp,ep/gp,main_name})
+              else
+                table.insert(sepgp.bids_main,{name,class,ep,gp,ep/gp})
+              end
             elseif (oskw_found) then
               bids_blacklist[sender] = true
-              table.insert(sepgp.bids_off,{name,class,ep,gp,ep/gp})
+              if (sepgp_altspool) and (main_name) then
+                table.insert(sepgp.bids_off,{name,class,ep,gp,ep/gp,main_name})
+              else
+                table.insert(sepgp.bids_off,{name,class,ep,gp,ep/gp})
+              end
             end
             sepgp_bids:Toggle(true)
             return
@@ -1753,7 +1912,7 @@ function sepgp:verifyGuildMember(name,silent)
   for i=1,GetNumGuildMembers(1) do
     local g_name, g_rank, g_rankIndex, g_level, g_class, g_zone, g_note, g_officernote, g_online = GetGuildRosterInfo(i)
     if (string.lower(name) == string.lower(g_name)) and (tonumber(g_level) == MAX_PLAYER_LEVEL) then
-      return g_name, g_class, g_rank
+      return g_name, g_class, g_rank, g_officernote
     end
   end
   if (name) and name ~= "" and not (silent) then
@@ -1777,6 +1936,20 @@ function sepgp:lootMaster()
     return true
   else
     return false
+  end
+end
+
+function sepgp:make_escable(framename,operation)
+  local found
+  for i in UISpecialFrames do
+    if UISpecialFrames[i]==framename then
+      found = i
+    end
+  end
+  if not found and operation=="add" then
+    table.insert(UISpecialFrames,framename)
+  elseif found and operation=="remove" then
+    table.remove(UISpecialFrames,found)
   end
 end
 
@@ -1859,6 +2032,12 @@ function sepgp:parseVersion(version,otherVersion)
   end
 end
 
+function sepgp:camelCase(word)
+  return string.gsub(word,"(%a)([%w_']*)",function(head,tail) 
+    return string.format("%s%s",string.upper(head),string.lower(tail)) 
+    end)
+end
+
 admin = function()
   return (CanEditOfficerNote() --[[and CanEditPublicNote()]])
 end
@@ -1901,7 +2080,8 @@ StaticPopupDialogs["SHOOTY_EPGP_SET_MAIN"] = {
   maxLetters = 12,
   OnAccept = function()
     local editBox = getglobal(this:GetParent():GetName().."EditBox")
-    sepgp_main = sepgp:verifyGuildMember(editBox:GetText())
+    local name = sepgp:camelCase(editBox:GetText())
+    sepgp_main = sepgp:verifyGuildMember(name)
   end,
   OnShow = function()
     getglobal(this:GetName().."EditBox"):SetText(sepgp_main or "")
@@ -2053,5 +2233,5 @@ function sepgp:EasyMenu_Initialize(level, menuList)
   end
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs,sepgp_debug
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

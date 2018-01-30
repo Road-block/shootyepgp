@@ -1,3 +1,9 @@
+--[[
+TODO: Bids need to be Main/Alt aware too
+- Bids tablet needs to show Main's points
+- Bids tablet needs to mark the Alts.
+]]
+
 local T = AceLibrary("Tablet-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")
@@ -40,10 +46,11 @@ function sepgp_bids:Refresh()
 end
 
 function sepgp_bids:setHideScript()
-  local detachedFrame, tablet
-  for i=1,5 do
-    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
-    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_bids" then
+  local i = 1
+  local tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  while (tablet) and i<100 do
+    if tablet.owner ~= nil and tablet.owner == "sepgp_bids" then
+      sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
       if not (tablet:GetScript("OnHide")) then
         tablet:SetScript("OnHide",function()
             if not T:IsAttached("sepgp_bids") then
@@ -52,8 +59,11 @@ function sepgp_bids:setHideScript()
             end
           end)
       end
-    end
-  end
+      break
+    end    
+    i = i+1
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  end  
 end
 
 function sepgp_bids:Top()
@@ -65,7 +75,7 @@ end
 function sepgp_bids:Toggle(forceShow)
   self:Top()
   if T:IsAttached("sepgp_bids") then
-    T:Detach("sepgp_bids")
+    T:Detach("sepgp_bids") -- show
     if (T:IsLocked("sepgp_bids")) then
       T:ToggleLocked("sepgp_bids")
     end
@@ -73,8 +83,8 @@ function sepgp_bids:Toggle(forceShow)
   elseif (forceShow) then
     sepgp_bids:Refresh()
   else
-    T:Attach("sepgp_bids")
-  end
+    T:Attach("sepgp_bids") -- hide
+  end  
 end
 
 function sepgp_bids:announceWinnerMS(name, pr)
@@ -115,7 +125,7 @@ function sepgp_bids:bidCountdown()
 end
 
 function sepgp_bids:BuildBidsTable()
-  -- {name,class,ep,gp,ep/gp}
+  -- {name,class,ep,gp,ep/gp[,main]}
   table.sort(sepgp.bids_main, function(a,b)
     return a[5] > b[5]
   end)
@@ -165,21 +175,23 @@ function sepgp_bids:OnTooltipUpdate()
       "text", C:Gold("MainSpec Bids")
     ):AddLine("text","")
   local maincat = T:AddCategory(
-      "columns", 4,
+      "columns", 5,
       "text",  C:Orange("Name"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
       "text2", C:Orange("ep"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT",
       "text3", C:Orange("gp"),     "child_text3R",   1, "child_text3G",   1, "child_text3B",   1, "child_justify3", "RIGHT",
       "text4", C:Orange("pr"),     "child_text4R",   1, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT",
+      "text5", C:Orange("Main"),     "child_text5R",   1, "child_text5G",   1, "child_text5B",   0, "child_justify5", "RIGHT",      
       "hideBlankLine", true
     )
   local tm = self:BuildBidsTable()
   for i = 1, table.getn(tm) do
-    local name, class, ep, gp, pr = unpack(tm[i])
+    local name, class, ep, gp, pr, main = unpack(tm[i])
     maincat:AddLine(
       "text", C:Colorize(BC:GetHexColor(class), name),
       "text2", string.format("%.4g", ep),
       "text3", string.format("%.4g", gp),
       "text4", string.format("%.4g", pr),
+      "text5", (main or ""),
       "func", "announceWinnerMS", "arg1", self, "arg2", name, "arg3", pr
     )
   end
@@ -188,25 +200,27 @@ function sepgp_bids:OnTooltipUpdate()
       "text", C:Silver("OffSpec Bids")
     ):AddLine("text","") 
   local offcat = T:AddCategory(
-      "columns", 4,
+      "columns", 5,
       "text",  C:Orange("Name"),   "child_textR",    1, "child_textG",    1, "child_textB",    1, "child_justify",  "LEFT",
       "text2", C:Orange("ep"),     "child_text2R",   1, "child_text2G",   1, "child_text2B",   1, "child_justify2", "RIGHT",
       "text3", C:Orange("gp"),     "child_text3R",   1, "child_text3G",   1, "child_text3B",   1, "child_justify3", "RIGHT",
       "text4", C:Orange("pr"),     "child_text4R",   1, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT",
+      "text5", C:Orange("Main"),     "child_text5R",   1, "child_text5G",   1, "child_text5B",   0, "child_justify5", "RIGHT",      
       "hideBlankLine", true
     )
   local _,to = self:BuildBidsTable()
   for i = 1, table.getn(to) do
-    local name, class, ep, gp, pr = unpack(to[i])
+    local name, class, ep, gp, pr, main = unpack(to[i])
     offcat:AddLine(
       "text", C:Colorize(BC:GetHexColor(class), name),
       "text2", string.format("%.4g", ep),
       "text3", string.format("%.4g", gp),
       "text4", string.format("%.4g", pr),
+      "text5", (main or ""),
       "func", "announceWinnerOS", "arg1", self, "arg2", name, "arg3", pr
     )
   end   
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

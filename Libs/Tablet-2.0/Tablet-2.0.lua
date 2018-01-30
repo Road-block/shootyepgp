@@ -1,6 +1,6 @@
 --[[
 Name: Tablet-2.0
-Revision: $Rev: 17873 $
+Revision: $Rev: 17999 $
 Author(s): ckknight (ckknight@gmail.com)
 Website: http://ckknight.wowinterface.com/
 Documentation: http://wiki.wowace.com/index.php/Tablet-2.0
@@ -10,7 +10,7 @@ Dependencies: AceLibrary, (optional) Dewdrop-2.0
 ]]
 
 local MAJOR_VERSION = "Tablet-2.0"
-local MINOR_VERSION = "$Revision: 17873 $"
+local MINOR_VERSION = "$Revision: 17999 $"
 
 if not AceLibrary then error(MAJOR_VERSION .. " requires AceLibrary") end
 if not AceLibrary:IsNewVersion(MAJOR_VERSION, MINOR_VERSION) then return end
@@ -2205,7 +2205,7 @@ function AcquireDetachedFrame(self, registration, data, detachedData)
 		detached.menu = nil
 		detached.detachedData.detached = nil
 		detached:SetOwner(nil)
-		detached.notInUse = TRUE
+		detached.notInUse = true
 	end
 
 	return AcquireDetachedFrame(self, registration, data, detachedData)

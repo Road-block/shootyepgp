@@ -40,10 +40,11 @@ function sepgp_reserves:Refresh()
 end
 
 function sepgp_reserves:setHideScript()
-  local detachedFrame, tablet
-  for i=1,5 do
-    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
-    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_reserves" then
+  local i = 1
+  local tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  while (tablet) and i<100 do
+    if tablet.owner ~= nil and tablet.owner == "sepgp_reserves" then
+      sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
       if not (tablet:GetScript("OnHide")) then
         tablet:SetScript("OnHide",function()
             if not T:IsAttached("sepgp_reserves") then
@@ -52,8 +53,11 @@ function sepgp_reserves:setHideScript()
             end
           end)
       end
-    end
-  end
+      break
+    end    
+    i = i+1
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  end  
 end
 
 function sepgp_reserves:Top()
@@ -65,7 +69,7 @@ end
 function sepgp_reserves:Toggle(forceShow)
   self:Top()
   if T:IsAttached("sepgp_reserves") then
-    T:Detach("sepgp_reserves")
+    T:Detach("sepgp_reserves") -- show
     if (T:IsLocked("sepgp_reserves")) then
       T:ToggleLocked("sepgp_reserves")
     end
@@ -73,8 +77,8 @@ function sepgp_reserves:Toggle(forceShow)
   elseif (forceShow) then
     sepgp_reserves:Refresh()
   else
-    T:Attach("sepgp_reserves")
-  end
+    T:Attach("sepgp_reserves") -- hide
+  end  
 end
 
 function sepgp_reserves:OnClickItem(name)
@@ -117,4 +121,4 @@ function sepgp_reserves:OnTooltipUpdate()
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

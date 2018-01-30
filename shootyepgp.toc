@@ -8,10 +8,10 @@
 ## X-Category: Guild
 ## X-Credits: shooty,Qcat(zhCN)
 ## Version: 3.31.1
-## X-Alpha: 3.31.2
+## X-Alpha: 3.4
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_raidonly, sepgp_dbver, sepgp_debug
-## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount
+## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount, sepgp_altspool, sepgp_altpercent
 
 Libs\AceLibrary\AceLibrary.lua
 Libs\AceOO-2.0\AceOO-2.0.lua
@@ -42,4 +42,5 @@ standings.lua
 bids.lua
 loot.lua
 reserves.lua
+alts.lua
 logs.lua

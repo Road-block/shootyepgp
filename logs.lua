@@ -45,10 +45,11 @@ function sepgp_logs:Refresh()
 end
 
 function sepgp_logs:setHideScript()
-  local detachedFrame, tablet
-  for i=1,5 do
-    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
-    if tablet and tablet.owner ~= nil and tablet.owner == "sepgp_logs" then
+  local i = 1
+  local tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  while (tablet) and i<100 do
+    if tablet.owner ~= nil and tablet.owner == "sepgp_logs" then
+      sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
       if not (tablet:GetScript("OnHide")) then
         tablet:SetScript("OnHide",function()
             if not T:IsAttached("sepgp_logs") then
@@ -57,8 +58,11 @@ function sepgp_logs:setHideScript()
             end
           end)
       end
-    end
-  end
+      break
+    end    
+    i = i+1
+    tablet = getglobal(string.format("Tablet20DetachedFrame%d",i))
+  end  
 end
 
 function sepgp_logs:Top()
@@ -70,7 +74,7 @@ end
 function sepgp_logs:Toggle(forceShow)
   self:Top()
   if T:IsAttached("sepgp_logs") then
-    T:Detach("sepgp_logs")
+    T:Detach("sepgp_logs") -- show
     if (T:IsLocked("sepgp_logs")) then
       T:ToggleLocked("sepgp_logs")
     end
@@ -78,8 +82,8 @@ function sepgp_logs:Toggle(forceShow)
   elseif (forceShow) then
     sepgp_logs:Refresh()
   else
-    T:Attach("sepgp_logs")
-  end
+    T:Attach("sepgp_logs") -- hide
+  end  
 end
 
 function sepgp_logs:reverse(arr)
@@ -118,4 +122,4 @@ function sepgp_logs:OnTooltipUpdate()
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
--- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_logs
+-- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs
