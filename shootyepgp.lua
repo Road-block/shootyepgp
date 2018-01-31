@@ -775,10 +775,10 @@ end
 
 function sepgp:refreshPRTablets()
   --if not T:IsAttached("sepgp_standings") then
-    sepgp_standings:Refresh()
+  sepgp_standings:Refresh()
   --end
   --if not T:IsAttached("sepgp_bids") then
-    sepgp_bids:Refresh()
+  sepgp_bids:Refresh()
   --end
 end
 
@@ -955,7 +955,7 @@ end
 function sepgp:givename_ep(getname,ep) -- awards ep to a single character
   if not (admin()) then return end
   local postfix, alt = ""
-  if (sepgp_altspool) then -- TODO: Main/Alt notification
+  if (sepgp_altspool) then
     local main = self:parseAlt(getname)
     if (main) then
       alt = getname
@@ -979,7 +979,7 @@ end
 function sepgp:givename_gp(getname,gp) -- assigns gp to a single character
   if not (admin()) then return end
   local postfix, alt = ""
-  if (sepgp_altspool) then -- TODO: Main/Alt notification
+  if (sepgp_altspool) then
     local main = self:parseAlt(getname)
     if (main) then
       alt = getname
