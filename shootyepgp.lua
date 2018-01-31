@@ -674,7 +674,8 @@ function sepgp:addonComms(prefix,message,channel,sender)
   end
   if (who) and (what) and (amount) then
     local msg
-    if (who == self._playerName) or (sepgp_main and (who == sepgp_main)) then
+    local for_main = (sepgp_main and (who == sepgp_main))
+    if (who == self._playerName) or (for_main) then
       if what == "EP" then
         if amount < 0 then
           msg = string.format(L["You have received a %d EP penalty."],amount)
@@ -758,7 +759,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
     end
     if msg and msg~="" then
       self:defaultPrint(msg)
-      self:my_epgp()
+      self:my_epgp(for_main)
     end
   end
 end
@@ -1090,8 +1091,13 @@ function sepgp:capcalc(ep,gp,gain)
   return pr_decay, cap_ep, cap_pr
 end
 
-function sepgp:my_epgp_announce()
-  local ep,gp = (self:get_ep_v3(self._playerName) or 0), (self:get_gp_v3(self._playerName) or sepgp.VARS.basegp)
+function sepgp:my_epgp_announce(use_main)
+  local ep,gp
+  if (use_main) then
+    ep,gp = (self:get_ep_v3(sepgp_main) or 0), (self:get_gp_v3(sepgp_main) or sepgp.VARS.basegp)
+  else
+    ep,gp = (self:get_ep_v3(self._playerName) or 0), (self:get_gp_v3(self._playerName) or sepgp.VARS.basegp)
+  end
   local pr = ep/gp
   local msg = string.format(L["You now have: %d EP %d GP |cffffff00%.03f|r|cffff7f00PR|r."], ep,gp,pr)
   self:defaultPrint(msg)
@@ -1102,9 +1108,9 @@ function sepgp:my_epgp_announce()
   end
 end
 
-function sepgp:my_epgp()
+function sepgp:my_epgp(use_main)
   GuildRoster()
-  self:ScheduleEvent("shootyepgpRosterRefresh",self.my_epgp_announce,3,self)
+  self:ScheduleEvent("shootyepgpRosterRefresh",self.my_epgp_announce,3,self,use_main)
 end
 
 ---------

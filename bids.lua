@@ -180,8 +180,14 @@ function sepgp_bids:OnTooltipUpdate()
   local tm = self:BuildBidsTable()
   for i = 1, table.getn(tm) do
     local name, class, ep, gp, pr, main = unpack(tm[i])
+    local namedesc
+    if (main) then
+      namedesc = string.format("%s(%s)", C:Colorize(BC:GetHexColor(class), name), L["Alt"])
+    else
+      namedesc = C:Colorize(BC:GetHexColor(class), name)
+    end    
     maincat:AddLine(
-      "text", C:Colorize(BC:GetHexColor(class), name),
+      "text", namedesc,
       "text2", string.format("%.4g", ep),
       "text3", string.format("%.4g", gp),
       "text4", string.format("%.4g", pr),
@@ -205,8 +211,14 @@ function sepgp_bids:OnTooltipUpdate()
   local _,to = self:BuildBidsTable()
   for i = 1, table.getn(to) do
     local name, class, ep, gp, pr, main = unpack(to[i])
+    local namedesc
+    if (main) then
+      namedesc = string.format("%s%(%s%)", C:Colorize(BC:GetHexColor(class), name), L["Alt"])
+    else
+      namedesc = C:Colorize(BC:GetHexColor(class), name)
+    end
     offcat:AddLine(
-      "text", C:Colorize(BC:GetHexColor(class), name),
+      "text", namedesc,
       "text2", string.format("%.4g", ep),
       "text3", string.format("%.4g", gp),
       "text4", string.format("%.4g", pr),

@@ -8,7 +8,7 @@
 ## X-Category: Guild
 ## X-Credits: shooty, Qcat(zhCN)
 ## Version: 3.31.1
-## X-Alpha: 3.4
+## X-Alpha: 3.40
 ## OptionalDeps: Ace2
 ## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_raidonly, sepgp_dbver, sepgp_debug
 ## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount, sepgp_altspool, sepgp_altpercent
