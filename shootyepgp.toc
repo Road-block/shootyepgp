@@ -6,7 +6,7 @@
 ## Author: Roadblock
 ## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
 ## X-Category: Guild
-## X-Credits: shooty,Qcat(zhCN)
+## X-Credits: shooty, Qcat(zhCN)
 ## Version: 3.31.1
 ## X-Alpha: 3.4
 ## OptionalDeps: Ace2

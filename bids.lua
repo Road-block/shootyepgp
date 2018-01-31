@@ -1,9 +1,3 @@
---[[
-TODO: Bids need to be Main/Alt aware too
-- Bids tablet needs to show Main's points
-- Bids tablet needs to mark the Alts.
-]]
-
 local T = AceLibrary("Tablet-2.0")
 local D = AceLibrary("Dewdrop-2.0")
 local C = AceLibrary("Crayon-2.0")

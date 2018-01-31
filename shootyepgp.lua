@@ -6,6 +6,7 @@ local C = AceLibrary("Crayon-2.0")
 local BC = AceLibrary("Babble-Class-2.2")
 local DF = AceLibrary("Deformat-2.0")
 local G = AceLibrary("Gratuity-2.0")
+local T = AceLibrary("Tablet-2.0")
 local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 sepgp.VARS = {
   basegp = 100,
@@ -771,6 +772,15 @@ function sepgp:shareSettings(force)
   end
 end
 
+function sepgp:refreshPRTablets()
+  if not T:IsAttached("sepgp_standings") then
+    sepgp_standings:Refresh()
+  end
+  if not T:IsAttached("sepgp_bids") then
+    sepgp_bids:Refresh()
+  end
+end
+
 ---------------------
 -- EPGP Operations
 ---------------------
@@ -921,6 +931,7 @@ function sepgp:award_raid_ep(ep) -- awards ep to raid members in zone
     self:addToLog(string.format(L["Giving %d ep to all raidmembers"],ep))    
     local addonMsg = string.format("RAID;AWARD;%s",ep)
     self:addonMessage(addonMsg,"RAID")
+    self:refreshPRTablets()
   else UIErrorsFrame:AddMessage(L["You aren't in a raid dummy"],1,0,0)end
 end
 
@@ -936,7 +947,7 @@ function sepgp:award_reserve_ep(ep) -- awards ep to reserve list
     self:addonMessage(addonMsg,"GUILD")
     sepgp.reserves = {}
     reserves_blacklist = {}
-    sepgp_reserves:Refresh()
+    self:refreshPRTablets()
   end
 end
 
@@ -1028,7 +1039,8 @@ function sepgp:decay_epgp_v3()
   if not (sepgp_saychannel=="OFFICER") then self:adminSay(msg) end
   local addonMsg = string.format("ALL;DECAY;%s",(1-(sepgp_decay or sepgp.VARS.decay))*100)
   self:addonMessage(addonMsg,"GUILD")
-  self:addToLog(msg)  
+  self:addToLog(msg)
+  self:refreshPRTablets() 
 end
 
 function sepgp:gp_reset_v2()
@@ -1064,7 +1076,7 @@ function sepgp:capcalc(ep,gp,gain)
   local ep_decayed = self:num_round(ep*sepgp_decay)
   local gp_decayed = math.max(sepgp.VARS.basegp,self:num_round(gp*sepgp_decay))
   local pr_decay = tonumber(string.format("%.03f",pr))-tonumber(string.format("%.03f",ep_decayed/gp_decayed))
-  if (pr_decay < 0.1) then 
+  if (pr_decay < 0.5) then 
     pr_decay = 0 
   else
     pr_decay = -tonumber(string.format("%.02f",pr_decay))
@@ -1098,8 +1110,6 @@ end
 ---------
 -- Menu
 ---------
-local T = AceLibrary("Tablet-2.0")
-
 sepgp.defaultMinimapPosition = 180
 sepgp.cannotDetachTooltip = true
 sepgp.tooltipHiddenWhenEmpty = false
@@ -1135,7 +1145,7 @@ end
 function sepgp:SetRefresh(flag)
   needRefresh = flag
   if (flag) then
-    sepgp_standings:Refresh()
+    self:refreshPRTablets()
   end
 end
 
@@ -1202,10 +1212,10 @@ function sepgp:buildClassMemberTable(roster,epgp)
       c[class].args[name].usage = usage
       if epgp == "ep" then
         c[class].args[name].get = "suggestedAwardEP"
-        c[class].args[name].set = function(v) sepgp:givename_ep(name, tonumber(v)) end
+        c[class].args[name].set = function(v) sepgp:givename_ep(name, tonumber(v)) sepgp:refreshPRTablets() end
       elseif epgp == "gp" then
         c[class].args[name].get = false
-        c[class].args[name].set = function(v) sepgp:givename_gp(name, tonumber(v)) end
+        c[class].args[name].set = function(v) sepgp:givename_gp(name, tonumber(v)) sepgp:refreshPRTablets() end
       end
       c[class].args[name].validate = function(v) return (type(v) == "number" or tonumber(v)) and tonumber(v) < sepgp.VARS.max end
     end
@@ -2153,6 +2163,7 @@ local sepgp_auto_gp_menu = {
       local data = dialog.data
       local player, price = data[sepgp.loot_index.player], data[sepgp.loot_index.price]
       sepgp:givename_gp((player==YOU and sepgp._playerName or player),price)
+      sepgp:refreshPRTablets()
       data[sepgp.loot_index.action] = sepgp.VARS.msgp
       local update = data[sepgp.loot_index.update] ~= nil
       sepgp:addOrUpdateLoot(data,update)
@@ -2166,6 +2177,7 @@ local sepgp_auto_gp_menu = {
       local data = dialog.data
       local player, off_price = data[sepgp.loot_index.player], data[sepgp.loot_index.off_price]
       sepgp:givename_gp((player==YOU and sepgp._playerName or player),off_price)
+      sepgp:refreshPRTablets()
       data[sepgp.loot_index.action] = sepgp.VARS.osgp
       local update = data[sepgp.loot_index.update] ~= nil
       sepgp:addOrUpdateLoot(data,update)

@@ -225,7 +225,6 @@ function sepgp_standings:Toggle(forceShow)
     self:setHideScript()
   elseif (forceShow) then
     sepgp_standings:Refresh()
-    
   else
     T:Attach("sepgp_standings") -- hide
   end  
