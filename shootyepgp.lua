@@ -705,8 +705,8 @@ function sepgp:addonComms(prefix,message,channel,sender)
       for progress,discount,decay,alts,altspct in string.gfind(what,"([^:]+):([^:]+):([^:]+):([^:]+):([^:]+)") do
         discount = tonumber(discount)
         decay = tonumber(decay)
-        altspct = tonumber(altspct)
         alts = (alts == "true") and true or false
+        altspct = tonumber(altspct)
         local settings_notice
         if progress and progress ~= sepgp_progress then
           sepgp_progress = progress
@@ -730,7 +730,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
             end
           end
         end
-        if alts and alts ~= sepgp_altspool then
+        if alts ~= nil and alts ~= sepgp_altspool then
           sepgp_altspool = alts
           if (admin()) then
             if (settings_notice) then
@@ -774,12 +774,12 @@ function sepgp:shareSettings(force)
 end
 
 function sepgp:refreshPRTablets()
-  if not T:IsAttached("sepgp_standings") then
+  --if not T:IsAttached("sepgp_standings") then
     sepgp_standings:Refresh()
-  end
-  if not T:IsAttached("sepgp_bids") then
+  --end
+  --if not T:IsAttached("sepgp_bids") then
     sepgp_bids:Refresh()
-  end
+  --end
 end
 
 ---------------------
@@ -1317,8 +1317,7 @@ function sepgp:buildMenu()
       name = L["Alts EP %"],
       desc = L["Set the % EP Alts can earn."],
       order = 66,
-      hidden = function() return not (admin()) end,
-      disabled = function() return not sepgp_altspool end,
+      hidden = function() return (not sepgp_altspool) or (not IsGuildLeader()) end,
       get = function() return sepgp_altpercent end,
       set = function(v) 
         sepgp_altpercent = v
@@ -1359,7 +1358,7 @@ function sepgp:buildMenu()
       get = function() return sepgp_progress end,
       set = function(v) 
         sepgp_progress = v 
-        sepgp_bids:Refresh() 
+        sepgp:refreshPRTablets()
         if (IsGuildLeader()) then
           sepgp:shareSettings(true)
         end
