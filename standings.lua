@@ -4,8 +4,50 @@ local C = AceLibrary("Crayon-2.0")
 
 local BC = AceLibrary("Babble-Class-2.2")
 local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
+local _G = getfenv(0)
 
 sepgp_standings = sepgp:NewModule("sepgp_standings", "AceDB-2.0")
+local groupings = {
+  "sepgp_groupbyclass",
+  "sepgp_groupbyarmor",
+  "sepgp_groupbyrole",
+}
+local PLATE, MAIL, LEATHER, CLOTH = 4,3,2,1
+local DPS, CASTER, HEALER, TANK = 4,3,2,1
+local class_to_armor = {
+  PALADIN = PLATE,
+  WARRIOR = PLATE,
+  HUNTER = MAIL,
+  SHAMAN = MAIL,
+  DRUID = LEATHER,
+  ROGUE = LEATHER,
+  MAGE = CLOTH,
+  PRIEST = CLOTH,
+  WARLOCK = CLOTH,
+}
+local armor_text = {
+  [CLOTH] = L["CLOTH"],
+  [LEATHER] = L["LEATHER"],
+  [MAIL] = L["MAIL"],
+  [PLATE] = L["PLATE"],
+}
+local class_to_role = {
+  PALADIN = {HEALER,DPS,TANK,CASTER},
+  PRIEST = {HEALER,CASTER},
+  DRUID = {HEALER,TANK,DPS,CASTER},
+  SHAMAN = {HEALER,DPS,CASTER},
+  MAGE = {CASTER},
+  WARLOCK = {CASTER},
+  ROGUE = {DPS},
+  HUNTER = {DPS},
+  WARRIOR = {TANK,DPS},
+}
+local role_text = {
+  [TANK] = L["TANK"],
+  [HEALER] = L["HEALER"],
+  [CASTER] = L["CASTER"],
+  [DPS] = L["PHYS DPS"],
+}
 local shooty_export = CreateFrame("Frame", "shooty_exportframe", UIParent)
 shooty_export:SetWidth(250)
 shooty_export:SetHeight(150)
@@ -63,7 +105,7 @@ shooty_export.scroll = CreateFrame("ScrollFrame", "shooty_exportscroll", shooty_
 shooty_export.scroll:SetPoint('TOPLEFT', shooty_export, 'TOPLEFT', 8, -30)
 shooty_export.scroll:SetPoint('BOTTOMRIGHT', shooty_export, 'BOTTOMRIGHT', -30, 8)
 shooty_export.scroll:SetScrollChild(shooty_export.edit)
-table.insert(UISpecialFrames,"shooty_exportframe")
+sepgp:make_escable("shooty_exportframe","add")
 
 function sepgp_standings:Export()
   shooty_export.action:Hide()
@@ -132,6 +174,46 @@ function sepgp_standings.import()
   end
 end
 
+local class_cache = setmetatable({},{__index = function(t,k)
+  local class
+  if BC:HasReverseTranslation(k) then
+    class = string.upper(BC:GetReverseTranslation(k))
+  else
+    class = string.upper(k)
+  end
+  if (class) then
+    rawset(t,k,class)
+    return class
+  end
+  return k
+end})
+function sepgp_standings:getArmorClass(class)
+  class = class_cache[class]
+  return class_to_armor[class] or 0
+end
+
+function sepgp_standings:getRolesClass(roster)
+  local roster_num = table.getn(roster)
+  for i=1,roster_num do
+    local player = roster[i]
+    local name, lclass, armor_class, ep, gp, pr = unpack(player)
+    local class = class_cache[lclass]
+    local roles = class_to_role[class]
+    if not (roles) then
+      player[3]=0
+    else
+      for i,role in ipairs(roles) do
+        if i==1 then
+          player[3]=role
+        else
+          table.insert(roster,{player[1],player[2],role,player[4],player[5],player[6]})
+        end
+      end      
+    end
+  end
+  return roster
+end 
+
 function sepgp_standings:OnEnable()
   if not T:IsRegistered("sepgp_standings") then
     T:Register("sepgp_standings",
@@ -153,7 +235,19 @@ function sepgp_standings:OnEnable()
           "text", L["Group by class"],
           "tooltipText", L["Group members by class."],
           "checked", sepgp_groupbyclass,
-          "func", function() sepgp_standings:ToggleGroupByClass() end
+          "func", function() sepgp_standings:ToggleGroupBy("sepgp_groupbyclass") end
+        )
+        D:AddLine(
+          "text", L["Group by armor"],
+          "tooltipText", L["Group members by armor."],
+          "checked", sepgp_groupbyarmor,
+          "func", function() sepgp_standings:ToggleGroupBy("sepgp_groupbyarmor") end
+        )
+        D:AddLine(
+          "text", L["Group by roles"],
+          "tooltipText", L["Group members by roles."],
+          "checked", sepgp_groupbyrole,
+          "func", function() sepgp_standings:ToggleGroupBy("sepgp_groupbyrole") end
         )
         D:AddLine(
           "text", L["Refresh"],
@@ -230,8 +324,14 @@ function sepgp_standings:Toggle(forceShow)
   end  
 end
 
-function sepgp_standings:ToggleGroupByClass()
-  sepgp_groupbyclass = not sepgp_groupbyclass 
+function sepgp_standings:ToggleGroupBy(setting)
+  for _,value in ipairs(groupings) do
+    if value ~= setting then
+      _G[value] = false
+    end
+  end
+  _G[setting] = not _G[setting]
+  self:Top()
   self:Refresh()
 end
 
@@ -242,7 +342,7 @@ function sepgp_standings:ToggleRaidOnly()
 end
 
 -- Builds a standings table with record:
--- name, class, EP, GP, PR
+-- name, class, armor_class, roles, EP, GP, PR
 -- and sorted by PR
 function sepgp_standings:BuildStandingsTable()
   local t = { }
@@ -269,25 +369,37 @@ function sepgp_standings:BuildStandingsTable()
       main = C:Colorize(BC:GetHexColor(main_class), main)
       sepgp.alts[main] = sepgp.alts[main] or {}
       sepgp.alts[main][name] = class
-    end    
+    end
+    local armor_class = self:getArmorClass(class)
     if ep > 0 then
       if (sepgp_raidonly) and next(r) then
         if r[name] then
-          table.insert(t,{name,class,ep,gp,ep/gp})
+          table.insert(t,{name,class,armor_class,ep,gp,ep/gp})
         end
       else
-      	table.insert(t,{name,class,ep,gp,ep/gp})
+      	table.insert(t,{name,class,armor_class,ep,gp,ep/gp})
       end
     end
   end
   if (sepgp_groupbyclass) then
     table.sort(t, function(a,b)
       if (a[2] ~= b[2]) then return a[2] > b[2]
-      else return a[5] > b[5] end
+      else return a[6] > b[6] end
     end)
+  elseif (sepgp_groupbyarmor) then
+    table.sort(t, function(a,b)
+      if (a[3] ~= b[3]) then return a[3] > b[3]
+      else return a[6] > b[6] end
+    end)
+  elseif (sepgp_groupbyrole) then
+    t = self:getRolesClass(t) -- we are subbing role into armor_class to avoid extra table creation
+    table.sort(t, function(a,b)
+    if (a[3] ~= b[3]) then return a[3] > b[3]
+      else return a[6] > b[6] end
+    end)   
   else
     table.sort(t, function(a,b)
-    return a[5] > b[5]
+      return a[6] > b[6]
     end)
   end
   return t
@@ -302,8 +414,41 @@ function sepgp_standings:OnTooltipUpdate()
       "text4", C:Orange(L["pr"]),     "child_text4R",   1, "child_text4G",   1, "child_text4B",   0, "child_justify4", "RIGHT"
     )
   local t = self:BuildStandingsTable()
+  local separator
   for i = 1, table.getn(t) do
-    local name, class, ep, gp, pr = unpack(t[i])
+    local name, class, armor_class, ep, gp, pr = unpack(t[i])
+    if (sepgp_groupbyarmor) or (sepgp_groupbyrole) then
+      if not (separator) then
+        if (sepgp_groupbyarmor) then
+          separator = armor_text[armor_class]
+        elseif (sepgp_groupbyrole) then
+          separator = role_text[armor_class]
+        end
+        if (separator) then
+          cat:AddLine(
+            "text", C:Green(separator),
+            "text2", "",
+            "text3", "",
+            "text4", ""
+          )
+        end
+      else
+        local last_separator = separator
+        if (sepgp_groupbyarmor) then
+          separator = armor_text[armor_class]
+        elseif (sepgp_groupbyrole) then
+          separator = role_text[armor_class]
+        end
+        if (separator) and (separator ~= last_separator) then
+          cat:AddLine(
+            "text", C:Green(separator),
+            "text2", "",
+            "text3", "",
+            "text4", ""
+          )          
+        end
+      end
+    end
     local text = C:Colorize(BC:GetHexColor(class), name)
     local text2 = string.format("%.4g", ep)
     local text3 = string.format("%.4g", gp)    
@@ -324,5 +469,5 @@ function sepgp_standings:OnTooltipUpdate()
   end
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

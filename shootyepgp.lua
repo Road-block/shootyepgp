@@ -1355,6 +1355,7 @@ function sepgp:buildMenu()
       name = L["Raid Progress"],
       desc = L["Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.\nUsed for suggested EP awards."],
       order = 90,
+      hidden = function() return not (admin()) end,
       get = function() return sepgp_progress end,
       set = function(v) 
         sepgp_progress = v 
@@ -1409,6 +1410,7 @@ function sepgp:buildMenu()
       name = L["Offspec Price %"],
       desc = L["Set Offspec Items GP Percent."],
       order = 115,
+      hidden = function() return not (admin()) end,
       get = function() return sepgp_discount end,
       set = function(v) 
         sepgp_discount = v
@@ -2250,5 +2252,5 @@ function sepgp:EasyMenu_Initialize(level, menuList)
   end
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

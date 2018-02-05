@@ -7,10 +7,10 @@
 ## X-Website: https://github.com/Road-block/shootyepgp/releases/latest
 ## X-Category: Guild
 ## X-Credits: shooty, Qcat(zhCN)
-## Version: 3.40
+## Version: 3.40.1
 ## X-Alpha: 
 ## OptionalDeps: Ace2
-## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_raidonly, sepgp_dbver, sepgp_debug
+## SavedVariables: sepgp_saychannel, sepgp_groupbyclass, sepgp_groupbyarmor, sepgp_groupbyrole, sepgp_raidonly, sepgp_dbver, sepgp_debug
 ## SavedVariablesPerCharacter: sepgp_main, sepgp_log, sepgp_looted, sepgp_decay, sepgp_reservechannel, sepgp_progress, sepgp_discount, sepgp_altspool, sepgp_altpercent
 
 Libs\AceLibrary\AceLibrary.lua
