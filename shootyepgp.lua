@@ -104,6 +104,14 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
         sepgp_standings:Toggle()
       end,
     },
+    restart = {
+      type = "execute",
+      name = L["Restart"],
+      desc = L["Restart shootyepgp if having startup problems."],
+      func = function() 
+        sepgp:OnEnable()
+      end,
+    },    
   }}
   --[[{
     type = "execute",
@@ -1972,10 +1980,10 @@ end
 
 local raidZones = {[L["Molten Core"]]="T1",[L["Onyxia\'s Lair"]]="T1.5",[L["Blackwing Lair"]]="T2",[L["Ahn\'Qiraj"]]="T2.5",[L["Naxxramas"]]="T3"}
 local zone_multipliers = {
-  ["T3"] = {["T3"]=1,["T2.5"]=0.75,["T2"]=0.5,["T1.5"]=0.25,["T1"]=0.25},
-  ["T2.5"] = {["T3"]=1,["T2.5"]=1,["T2"]=0.7,["T1.5"]=0.4,["T1"]=0.4},
-  ["T2"] = {["T3"]=1,["T2.5"]=1,["T2"]=1,["T1.5"]=0.5,["T1"]=0.5},
-  ["T1"] = {["T3"]=1,["T2.5"]=1,["T2"]=1,["T1.5"]=1,["T1"]=1}
+  ["T3"] =   {["T3"]=1,["T2.5"]=0.75,["T2"]=0.5,["T1.5"]=0.25,["T1"]=0.25},
+  ["T2.5"] = {["T3"]=1,["T2.5"]=1,   ["T2"]=0.7,["T1.5"]=0.4, ["T1"]=0.4},
+  ["T2"] =   {["T3"]=1,["T2.5"]=1,   ["T2"]=1,  ["T1.5"]=0.5, ["T1"]=0.5},
+  ["T1"] =   {["T3"]=1,["T2.5"]=1,   ["T2"]=1,  ["T1.5"]=1,   ["T1"]=1}
 }
 function sepgp:suggestedAwardEP()
   local currentTier, zoneEN, zoneLoc, checkTier, multiplier

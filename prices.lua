@@ -365,6 +365,7 @@ local prices = {
   [21701] = {88,"T2.5"}; --Cloak of the Concentrated Hatred
   [21702] = {4,"T2.5"}; --Amulet of Foul Warding
   [21703] = {24,"T2.5"}; --Hammer of Ji'zhi
+  [21704] = {68,"T2.5"}; --Boots of the Redeemed Prophecy
   [21705] = {12,"T2.5"}; --Boots of the Fallen Prophet
   [21706] = {28,"T2.5"}; --Boots of the Unwavering Will
   [21707] = {48,"T2.5"}; --Ring of Swarming Thought
@@ -769,10 +770,10 @@ sepgp.gp_prices = prices
   ["T3"] = 9
 }]]
 local progress_scaling = {
-  ["T3"] = {["T3"]=1,["T2.5"]=1,["T2"]=1,["T1.5"]=1,["T1"]=1},
-  ["T2.5"] = {["T3"]=1.5,["T2.5"]=1.5,["T2"]=2,["T1.5"]=2,["T1"]=2},
-  ["T2"] = {["T3"]=1.5,["T2.5"]=1.5,["T2"]=3,["T1.5"]=3,["T1"]=3},
-  ["T1"] = {["T3"]=4.5,["T2.5"]=4.5,["T2"]=4.5,["T1.5"]=6,["T1"]=9}
+  ["T3"] =   {["T3"]=1,  ["T2.5"]=1,  ["T2"]=1,  ["T1.5"]=1,["T1"]=1},
+  ["T2.5"] = {["T3"]=1.5,["T2.5"]=1.5,["T2"]=2,  ["T1.5"]=2,["T1"]=2},
+  ["T2"] =   {["T3"]=2,  ["T2.5"]=2,  ["T2"]=3,  ["T1.5"]=3,["T1"]=3},
+  ["T1"] =   {["T3"]=4.5,["T2.5"]=4.5,["T2"]=4.5,["T1.5"]=6,["T1"]=9}
 }
 local function get_adjusted_price(price,tier,progress)
   if not progress_scaling[progress] then return price end
