@@ -68,6 +68,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Clear Loot Table."],
       func = function()
         sepgp_looted = {}
+        sepgp:defaultPrint(L["Loot info cleared"])
       end,
     },
     clearlogs = {
@@ -76,6 +77,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Clear Logs Table."],
       func = function()
         sepgp_log = {}
+        sepgp:defaultPrint(L["Logs cleared"])
       end,
     },
     show = {
@@ -92,6 +94,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Restart shootyepgp if having startup problems."],
       func = function() 
         sepgp:OnEnable()
+        sepgp:defaultPrint(L["Restarted"])
       end,
     },
   }},
@@ -110,6 +113,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Restart shootyepgp if having startup problems."],
       func = function() 
         sepgp:OnEnable()
+        sepgp:defaultPrint(L["Restarted"])
       end,
     },    
   }}
@@ -194,6 +198,7 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   else
     self:RegisterEvent("AceEvent_FullyInitialized")
   end
+  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
 end
 
 function sepgp:OnDisable()
@@ -251,7 +256,6 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   for i=1,6 do
     self:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
   end
-  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
   self._hasInitFull = true
 end
 
