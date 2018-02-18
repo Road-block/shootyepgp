@@ -10,6 +10,12 @@ L:RegisterTranslations("enUS", function() return {
   ["Raid Only"] = true,
   ["Only show members in raid."] = true,
   ["Restarted"] = true,
+  ["Progress"] = true,
+  ["Print Progress Multiplier."] = true,
+  ["Offspec"] = true,
+  ["Print Offspec Price."] = true,
+  ["Progress Setting: %s"] = true,
+  ["Offspec Price: %s%%"] = true,
   -- bids
   ["shootyepgp bids"] = true,
   ["Winning Mainspec Bid: %s (%.03f PR)"] = true,
@@ -408,4 +414,10 @@ L:RegisterTranslations("zhCN", function() return {
   ["Alts"] = "Alts",
   ["Logs cleared"] = "Logs cleared",
   ["Restarted"] = "Restarted",
+  ["Progress"] = "Progress",
+  ["Print Progress Multiplier."] = "Print Progress Multiplier.",
+  ["Offspec"] = "Offspec",
+  ["Print Offspec Price."] = "Print Offspec Price.",
+  ["Progress Setting: %s"] = "Progress Setting: %s",
+  ["Offspec Price: %s%%"] = "Offspec Price: %s%%",  
 } end)

@@ -61,7 +61,17 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       func = function()
         sepgp_bids:Toggle()
       end,
+      order = 1,
     },
+    show = {
+      type = "execute",
+      name = L["Standings"],
+      desc = L["Show Standings Table."],
+      func = function()
+        sepgp_standings:Toggle()
+      end,
+      order = 2,
+    },    
     clearloot = {
       type = "execute",
       name = L["ClearLoot"],
@@ -70,6 +80,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
         sepgp_looted = {}
         sepgp:defaultPrint(L["Loot info cleared"])
       end,
+      order = 3,
     },
     clearlogs = {
       type = "execute",
@@ -79,15 +90,26 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
         sepgp_log = {}
         sepgp:defaultPrint(L["Logs cleared"])
       end,
+      order = 4,
     },
-    show = {
+    progress = {
       type = "execute",
-      name = L["Standings"],
-      desc = L["Show Standings Table."],
+      name = L["Progress"],
+      desc = L["Print Progress Multiplier."],
       func = function()
-        sepgp_standings:Toggle()
+        sepgp:defaultPrint(sepgp_progress)
       end,
+      order = 5,
     },
+    offspec = {
+      type = "execute",
+      name = L["Offspec"],
+      desc = L["Print Offspec Price."],
+      func = function()
+        sepgp:defaultPrint(string.format("%s%%",sepgp_discount*100))
+      end,
+      order = 6,
+    },    
     restart = {
       type = "execute",
       name = L["Restart"],
@@ -96,6 +118,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
         sepgp:OnEnable()
         sepgp:defaultPrint(L["Restarted"])
       end,
+      order = 7,
     },
   }},
 {type = "group", handler = sepgp, args = {
@@ -106,6 +129,25 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       func = function()
         sepgp_standings:Toggle()
       end,
+      order = 1,
+    },
+    progress = {
+      type = "execute",
+      name = L["Progress"],
+      desc = L["Print Progress Multiplier."],
+      func = function()
+        sepgp:defaultPrint(sepgp_progress)
+      end,
+      order = 2,
+    },
+    offspec = {
+      type = "execute",
+      name = L["Offspec"],
+      desc = L["Print Offspec Price."],
+      func = function()
+        sepgp:defaultPrint(string.format("%s%%",sepgp_discount*100))
+      end,
+      order = 3,
     },
     restart = {
       type = "execute",
@@ -115,6 +157,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
         sepgp:OnEnable()
         sepgp:defaultPrint(L["Restarted"])
       end,
+      order = 4,
     },    
   }}
   --[[{
@@ -267,7 +310,8 @@ function sepgp:OnMenuRequest()
     self:SetRefresh(true)
     GuildRoster()
   end
-  D:FeedAceOptionsTable(self:buildMenu())
+  self._options = self:buildMenu()
+  D:FeedAceOptionsTable(self._options)
 end
 
 function sepgp:TipHook()
@@ -766,6 +810,8 @@ function sepgp:addonComms(prefix,message,channel,sender)
           local sender_rank = string.format("%s(%s)",C:Colorize(BC:GetHexColor(class),sender),rank)
           settings_notice = settings_notice..string.format(L[" settings accepted from %s"],sender_rank)
           self:defaultPrint(settings_notice)
+          self._options.args["progress_tier_header"].name = string.format(L["Progress Setting: %s"],sepgp_progress)
+          self._options.args["set_discount_header"].name = string.format(L["Offspec Price: %s%%"],sepgp_discount*100)
         end
       end
     end
@@ -1362,6 +1408,12 @@ function sepgp:buildMenu()
         sepgp:SetRefresh(true)
       end,
     }
+    options.args["progress_tier_header"] = {
+      type = "header",
+      name = string.format(L["Progress Setting: %s"],sepgp_progress),
+      order = 85,
+      hidden = function() return admin() end,
+    }
     options.args["progress_tier"] = {
       type = "text",
       name = L["Raid Progress"],
@@ -1416,6 +1468,12 @@ function sepgp:buildMenu()
       bigStep = 0.05,
       isPercent = true,
       hidden = function() return not (admin()) end,    
+    }
+    options.args["set_discount_header"] = {
+      type = "header",
+      name = string.format(L["Offspec Price: %s%%"],sepgp_discount*100),
+      order = 111,
+      hidden = function() return admin() end,
     }
     options.args["set_discount"] = {
       type = "range",
