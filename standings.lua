@@ -341,6 +341,29 @@ function sepgp_standings:ToggleRaidOnly()
   sepgp:SetRefresh(true)
 end
 
+local pr_sorter_standings = function(a,b)
+  if sepgp_minep > 0 then
+    local a_over = a[4]-sepgp_minep >= 0
+    local b_over = b[4]-sepgp_minep >= 0
+    if a_over and b_over or (not a_over and not b_over) then
+      if a[6] ~= b[6] then
+        return a[6] > b[6]
+      else
+        return a[4] > b[4]
+      end
+    elseif a_over and (not b_over) then
+      return true
+    elseif b_over and (not a_over) then
+      return false
+    end
+  else
+    if a[6] ~= b[6] then
+      return a[6] > b[6]
+    else
+      return a[4] > b[4]
+    end
+  end
+end
 -- Builds a standings table with record:
 -- name, class, armor_class, roles, EP, GP, PR
 -- and sorted by PR
@@ -384,23 +407,21 @@ function sepgp_standings:BuildStandingsTable()
   if (sepgp_groupbyclass) then
     table.sort(t, function(a,b)
       if (a[2] ~= b[2]) then return a[2] > b[2]
-      else return a[6] > b[6] end
+      else return pr_sorter_standings(a,b) end
     end)
   elseif (sepgp_groupbyarmor) then
     table.sort(t, function(a,b)
       if (a[3] ~= b[3]) then return a[3] > b[3]
-      else return a[6] > b[6] end
+      else return pr_sorter_standings(a,b) end
     end)
   elseif (sepgp_groupbyrole) then
     t = self:getRolesClass(t) -- we are subbing role into armor_class to avoid extra table creation
     table.sort(t, function(a,b)
     if (a[3] ~= b[3]) then return a[3] > b[3]
-      else return a[6] > b[6] end
+      else return pr_sorter_standings(a,b) end
     end)   
   else
-    table.sort(t, function(a,b)
-      return a[6] > b[6]
-    end)
+    table.sort(t, pr_sorter_standings)
   end
   return t
 end
@@ -450,9 +471,15 @@ function sepgp_standings:OnTooltipUpdate()
       end
     end
     local text = C:Colorize(BC:GetHexColor(class), name)
-    local text2 = string.format("%.4g", ep)
+    local text2, text4
+    if sepgp_minep > 0 and ep < sepgp_minep then
+      text2 = C:Red(string.format("%.4g", ep))
+      text4 = C:Red(string.format("%.4g", pr))
+    else
+      text2 = string.format("%.4g", ep)
+      text4 = string.format("%.4g", pr)
+    end
     local text3 = string.format("%.4g", gp)    
-    local text4 = string.format("%.4g", pr)
     if ((sepgp._playerName) and sepgp._playerName == name) or ((sepgp_main) and sepgp_main == name) then
       text = string.format("(*)%s",text)
       local pr_decay = sepgp:capcalc(ep,gp)
@@ -469,5 +496,5 @@ function sepgp_standings:OnTooltipUpdate()
   end
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

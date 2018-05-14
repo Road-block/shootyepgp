@@ -16,6 +16,9 @@ L:RegisterTranslations("enUS", function() return {
   ["Print Offspec Price."] = true,
   ["Progress Setting: %s"] = true,
   ["Offspec Price: %s%%"] = true,
+  ["Minimum EP: %s"] = true,
+  ["Minimum EP"] = true,
+  ["Set Minimum EP"] = true,
   -- bids
   ["shootyepgp bids"] = true,
   ["Winning Mainspec Bid: %s (%.03f PR)"] = true,
@@ -209,6 +212,7 @@ Results will print here when done.]],
   [", %s\'s Main."] = true,
   ["Your main has been set to %s"] = true,
   ["Alts"] = true,
+  ["New Minimum EP"] = true,
 } end)
 
 L:RegisterTranslations("zhCN", function() return {
@@ -419,5 +423,9 @@ L:RegisterTranslations("zhCN", function() return {
   ["Offspec"] = "Offspec",
   ["Print Offspec Price."] = "Print Offspec Price.",
   ["Progress Setting: %s"] = "Progress Setting: %s",
-  ["Offspec Price: %s%%"] = "Offspec Price: %s%%",  
+  ["Offspec Price: %s%%"] = "Offspec Price: %s%%",
+  ["Minimum EP: %s"] = "Minimum EP: %s",
+  ["Minimum EP"] = "Minimum EP",
+  ["Set Minimum EP"] = "Set Minimum EP",
+  ["New Minimum EP"] = "New Minimum EP",
 } end)

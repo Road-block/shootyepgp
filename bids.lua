@@ -118,14 +118,34 @@ function sepgp_bids:bidCountdown()
   self:ScheduleEvent("shootyepgpBidCountdownFinish",self.countdownFinish,6,self)
 end
 
+local pr_sorter_bids = function(a,b)
+  if sepgp_minep > 0 then
+    local a_over = a[3]-sepgp_minep >= 0
+    local b_over = b[3]-sepgp_minep >= 0
+    if a_over and b_over or (not a_over and not b_over) then
+      if a[5] ~= b[5] then
+        return a[5] > b[5]
+      else
+        return a[3] > b[3]
+      end
+    elseif a_over and (not b_over) then
+      return true
+    elseif b_over and (not a_over) then
+      return false
+    end
+  else
+    if a[5] ~= b[5] then
+      return a[5] > b[5]
+    else
+      return a[3] > b[3]
+    end
+  end
+end
+
 function sepgp_bids:BuildBidsTable()
   -- {name,class,ep,gp,ep/gp[,main]}
-  table.sort(sepgp.bids_main, function(a,b)
-    return a[5] > b[5]
-  end)
-  table.sort(sepgp.bids_off, function(a,b)
-    return a[5] > b[5]
-  end)
+  table.sort(sepgp.bids_main, pr_sorter_bids)
+  table.sort(sepgp.bids_off, pr_sorter_bids)
   return sepgp.bids_main, sepgp.bids_off
 end
 
@@ -185,12 +205,20 @@ function sepgp_bids:OnTooltipUpdate()
       namedesc = string.format("%s(%s)", C:Colorize(BC:GetHexColor(class), name), L["Alt"])
     else
       namedesc = C:Colorize(BC:GetHexColor(class), name)
-    end    
+    end
+    local text2, text4
+    if sepgp_minep > 0 and ep < sepgp_minep then
+      text2 = C:Red(string.format("%.4g", ep))
+      text4 = C:Red(string.format("%.4g", pr))
+    else
+      text2 = string.format("%.4g", ep)
+      text4 = string.format("%.4g", pr)
+    end   
     maincat:AddLine(
       "text", namedesc,
-      "text2", string.format("%.4g", ep),
+      "text2", text2,
       "text3", string.format("%.4g", gp),
-      "text4", string.format("%.4g", pr),
+      "text4", text4,
       "text5", (main or ""),
       "func", "announceWinnerMS", "arg1", self, "arg2", name, "arg3", pr
     )
@@ -217,16 +245,24 @@ function sepgp_bids:OnTooltipUpdate()
     else
       namedesc = C:Colorize(BC:GetHexColor(class), name)
     end
+    local text2, text4
+    if sepgp_minep > 0 and ep < sepgp_minep then
+      text2 = C:Red(string.format("%.4g", ep))
+      text4 = C:Red(string.format("%.4g", pr))
+    else
+      text2 = string.format("%.4g", ep)
+      text4 = string.format("%.4g", pr)
+    end    
     offcat:AddLine(
       "text", namedesc,
-      "text2", string.format("%.4g", ep),
+      "text2", text2,
       "text3", string.format("%.4g", gp),
-      "text4", string.format("%.4g", pr),
+      "text4", text4,
       "text5", (main or ""),
       "func", "announceWinnerOS", "arg1", self, "arg2", name, "arg3", pr
     )
   end   
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_log,sepgp_dbver,sepgp_looted
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

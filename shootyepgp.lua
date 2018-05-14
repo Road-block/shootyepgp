@@ -10,6 +10,7 @@ local T = AceLibrary("Tablet-2.0")
 local L = AceLibrary("AceLocale-2.2"):new("shootyepgp")
 sepgp.VARS = {
   basegp = 100,
+  minep = 0,
   baseaward_ep = 100,
   decay = 0.9,
   max = 1000,
@@ -42,6 +43,7 @@ local bidlink = {
   ["ms"]=L["|cffFF3333|Hshootybid:1:$ML|h[Mainspec/NEED]|h|r"],
   ["os"]=L["|cff009900|Hshootybid:2:$ML|h[Offspec/GREED]|h|r"]
 }
+local options
 do
   for i=1,40 do
     raidUnit[i] = "raid"..i
@@ -185,9 +187,261 @@ sepgp.timer:SetScript("OnEvent",function()
 end)
 sepgp.alts = {}
 
+function sepgp:buildMenu()
+  if not (options) then
+    options = {
+    type = "group",
+    desc = L["shootyepgp options"],
+    handler = self,
+    args = { }
+    }
+    options.args["ep"] = {
+      type = "group",
+      name = L["+EPs to Member"],
+      desc = L["Account EPs for member."],
+      order = 10,
+      hidden = function() return not (admin()) end,
+    }
+    options.args["ep_raid"] = {
+      type = "text",
+      name = L["+EPs to Raid"],
+      desc = L["Award EPs to all raid members."],
+      order = 20,
+      get = "suggestedAwardEP",
+      set = function(v) sepgp:award_raid_ep(tonumber(v)) end,
+      usage = "<EP>",
+      hidden = function() return not (admin()) end,
+      validate = function(v)
+        local n = tonumber(v)
+        return n and n >= 0 and n < sepgp.VARS.max
+      end
+    }
+    options.args["gp"] = {
+      type = "group",
+      name = L["+GPs to Member"],
+      desc = L["Account GPs for member."],
+      order = 30,
+      hidden = function() return not (admin()) end,
+    }
+    options.args["ep_reserves"] = {
+      type = "text",
+      name = L["+EPs to Reserves"],
+      desc = L["Award EPs to all active Reserves."],
+      order = 40,
+      get = "suggestedAwardEP",
+      set = function(v) sepgp:award_reserve_ep(tonumber(v)) end,
+      usage = "<EP>",
+      hidden = function() return not (admin()) end,
+      validate = function(v)
+        local n = tonumber(v)
+        return n and n >= 0 and n < sepgp.VARS.max
+      end    
+    }
+    options.args["reserves"] = {
+      type = "toggle",
+      name = L["Enable Reserves"],
+      desc = L["Participate in Standby Raiders List.\n|cffff0000Requires Main Character Name.|r"],
+      order = 50,
+      get = function() return (sepgp.reservesChannelID ~= nil) and (sepgp.reservesChannelID ~= 0) end,
+      set = function(v) sepgp:reservesToggle(v) end,
+      disabled = function() return (sepgp_main == nil) end
+    }
+    options.args["afkcheck_reserves"] = {
+      type = "execute",
+      name = L["AFK Check Reserves"],
+      desc = L["AFK Check Reserves List"],
+      order = 60,
+      hidden = function() return not (admin()) end,
+      func = function() sepgp:afkcheck_reserves() end
+    }
+    options.args["alts"] = {
+      type = "toggle",
+      name = L["Enable Alts"],
+      desc = L["Allow Alts to use Main\'s EPGP."],
+      order = 63,
+      hidden = function() return not (admin()) end,
+      disabled = function() return not (IsGuildLeader()) end,
+      get = function() return not not sepgp_altspool end,
+      set = function(v) 
+        sepgp_altspool = not sepgp_altspool
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+    }
+    options.args["alts_percent"] = {
+      type = "range",
+      name = L["Alts EP %"],
+      desc = L["Set the % EP Alts can earn."],
+      order = 66,
+      hidden = function() return (not sepgp_altspool) or (not IsGuildLeader()) end,
+      get = function() return sepgp_altpercent end,
+      set = function(v) 
+        sepgp_altpercent = v
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+      min = 0.5,
+      max = 1,
+      step = 0.05,
+      isPercent = true
+    }
+    options.args["set_main"] = {
+      type = "text",
+      name = L["Set Main"],
+      desc = L["Set your Main Character for Reserve List."],
+      order = 70,
+      usage = "<MainChar>",
+      get = function() return sepgp_main end,
+      set = function(v) sepgp_main = (sepgp:verifyGuildMember(v)) end,
+    }    
+    options.args["raid_only"] = {
+      type = "toggle",
+      name = L["Raid Only"],
+      desc = L["Only show members in raid."],
+      order = 80,
+      get = function() return not not sepgp_raidonly end,
+      set = function(v) 
+        sepgp_raidonly = not sepgp_raidonly
+        sepgp:SetRefresh(true)
+      end,
+    }
+    options.args["progress_tier_header"] = {
+      type = "header",
+      name = string.format(L["Progress Setting: %s"],sepgp_progress),
+      order = 85,
+      hidden = function() return admin() end,
+    }
+    options.args["progress_tier"] = {
+      type = "text",
+      name = L["Raid Progress"],
+      desc = L["Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.\nUsed for suggested EP awards."],
+      order = 90,
+      hidden = function() return not (admin()) end,
+      get = function() return sepgp_progress end,
+      set = function(v) 
+        sepgp_progress = v 
+        sepgp:refreshPRTablets()
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+      validate = { ["T3"]=L["4.Naxxramas"], ["T2.5"]=L["3.Temple of Ahn\'Qiraj"], ["T2"]=L["2.Blackwing Lair"], ["T1"]=L["1.Molten Core"]},
+    }
+    options.args["report_channel"] = {
+      type = "text",
+      name = L["Reporting channel"],
+      desc = L["Channel used by reporting functions."],
+      order = 95,
+      hidden = function() return not (admin()) end,
+      get = function() return sepgp_saychannel end,
+      set = function(v) sepgp_saychannel = v end,
+      validate = { "PARTY", "RAID", "GUILD", "OFFICER" },
+    }    
+    options.args["decay"] = {
+      type = "execute",
+      name = L["Decay EPGP"],
+      desc = string.format(L["Decays all EPGP by %s%%"],(1-(sepgp_decay or sepgp.VARS.decay))*100),
+      order = 100,
+      hidden = function() return not (admin()) end,
+      func = function() sepgp:decay_epgp_v3() end 
+    }    
+    options.args["set_decay"] = {
+      type = "range",
+      name = L["Set Decay %"],
+      desc = L["Set Decay percentage (Admin only)."],
+      order = 110,
+      usage = "<Decay>",
+      get = function() return (1.0-sepgp_decay) end,
+      set = function(v) 
+        sepgp_decay = (1 - v)
+        options.args["decay"].desc = string.format(L["Decays all EPGP by %s%%"],(1-sepgp_decay)*100)
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+      min = 0.01,
+      max = 0.5,
+      step = 0.01,
+      bigStep = 0.05,
+      isPercent = true,
+      hidden = function() return not (admin()) end,    
+    }
+    options.args["set_discount_header"] = {
+      type = "header",
+      name = string.format(L["Offspec Price: %s%%"],sepgp_discount*100),
+      order = 111,
+      hidden = function() return admin() end,
+    }
+    options.args["set_discount"] = {
+      type = "range",
+      name = L["Offspec Price %"],
+      desc = L["Set Offspec Items GP Percent."],
+      order = 115,
+      hidden = function() return not (admin()) end,
+      get = function() return sepgp_discount end,
+      set = function(v) 
+        sepgp_discount = v
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end
+      end,
+      min = 0,
+      max = 1,
+      step = 0.05,
+      isPercent = true
+    }
+    options.args["set_min_ep_header"] = {
+      type = "header",
+      name = string.format(L["Minimum EP: %s"],sepgp_minep),
+      order = 117,
+      hidden = function() return admin() end,
+    }
+    options.args["set_min_ep"] = {
+      type = "text",
+      name = L["Minimum EP"],
+      desc = L["Set Minimum EP"],
+      usage = "<minep>",
+      order = 118,
+      get = function() return sepgp_minep end,
+      set = function(v) 
+        sepgp_minep = tonumber(v)
+        sepgp:refreshPRTablets()
+        if (IsGuildLeader()) then
+          sepgp:shareSettings(true)
+        end        
+      end,
+      validate = function(v) 
+        local n = tonumber(v)
+        return n and n >= 0 and n <= sepgp.VARS.max
+      end,
+      hidden = function() return not admin() end,
+    }
+    options.args["reset"] = {
+     type = "execute",
+     name = L["Reset EPGP"],
+     desc = string.format(L["Resets everyone\'s EPGP to 0/%d (Admin only)."],sepgp.VARS.basegp),
+     order = 120,
+     hidden = function() return not (IsGuildLeader()) end,
+     func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET") end
+    }
+  end
+  if (needInit) or (needRefresh) then
+    local members = sepgp:buildRosterTable()
+    self:debugPrint(string.format(L["Scanning %d members for EP/GP data. (%s)"],table.getn(members),(sepgp_raidonly and "Raid" or "Full")))
+    options.args["ep"].args = sepgp:buildClassMemberTable(members,"ep")
+    options.args["gp"].args = sepgp:buildClassMemberTable(members,"gp")
+    if (needInit) then needInit = false end
+    if (needRefresh) then needRefresh = false end
+  end
+  return options
+end
+
 function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_saychannel == nil then sepgp_saychannel = "GUILD" end
   if sepgp_decay == nil then sepgp_decay = sepgp.VARS.decay end
+  if sepgp_minep == nil then sepgp_minep = sepgp.VARS.minep end
   if sepgp_progress == nil then sepgp_progress = "T1" end
   if sepgp_discount == nil then sepgp_discount = 0.25 end
   if sepgp_altspool == nil then sepgp_altspool = false end
@@ -231,7 +485,6 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
   self:RegisterEvent("CHAT_MSG_WHISPER","captureBid")
-  self:RegisterEvent("CHAT_MSG_ADDON","addonComms")
   self:RegisterEvent("CHAT_MSG_LOOT","captureLoot")
   self:RegisterEvent("TRADE_PLAYER_ITEM_CHANGED","tradeLoot")
   self:RegisterEvent("TRADE_ACCEPT_UPDATE","tradeLoot")
@@ -252,6 +505,8 @@ end
 function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER_LOGIN, PLAYER_ENTERING_WORLD (3)
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="AceEvent_FullyInitialized"})
   if self._hasInitFull then return end
+  self._options = self:buildMenu()
+  
   for i=1,NUM_CHAT_WINDOWS do
     local tab = getglobal("ChatFrame"..i.."Tab")
     local cf = getglobal("ChatFrame"..i)
@@ -263,7 +518,9 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
       break
     end
   end 
-
+  
+  self:RegisterEvent("CHAT_MSG_ADDON","addonComms")
+  
   if (sepgp_main == nil) or (sepgp_main == "") then
     if (IsInGuild()) then
       StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
@@ -283,6 +540,8 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
     pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,pfUI_config.tooltip.alpha)
   end
+  -- hook GiveMasterLoot to catch loot assign to members too far for chat parsing
+  self:SecureHook("GiveMasterLoot")
   -- hook SetItemRef to parse our client bid links
   self:Hook("SetItemRef")
   -- hook tooltip to add our GP values
@@ -758,9 +1017,10 @@ function sepgp:addonComms(prefix,message,channel,sender)
         self:shareSettings()
       end
     elseif who == "SETTINGS" then
-      for progress,discount,decay,alts,altspct in string.gfind(what,"([^:]+):([^:]+):([^:]+):([^:]+):([^:]+)") do
+      for progress,discount,decay,minep,alts,altspct in string.gfind(what, "([^:]+):([^:]+):([^:]+):([^:]+):([^:]+):([^:]+)") do
         discount = tonumber(discount)
         decay = tonumber(decay)
+        minep = tonumber(minep)
         alts = (alts == "true") and true or false
         altspct = tonumber(altspct)
         local settings_notice
@@ -775,6 +1035,11 @@ function sepgp:addonComms(prefix,message,channel,sender)
           else
             settings_notice = L["New offspec price %"]
           end
+        end
+        if minep and minep ~= sepgp_minep then
+          sepgp_minep = minep
+          settings_notice = L["New Minimum EP"]
+          sepgp:refreshPRTablets()
         end
         if decay and decay ~= sepgp_decay then
           sepgp_decay = decay
@@ -812,6 +1077,7 @@ function sepgp:addonComms(prefix,message,channel,sender)
           self:defaultPrint(settings_notice)
           self._options.args["progress_tier_header"].name = string.format(L["Progress Setting: %s"],sepgp_progress)
           self._options.args["set_discount_header"].name = string.format(L["Offspec Price: %s%%"],sepgp_discount*100)
+          self._options.args["set_min_ep_header"].name = string.format(L["Minimum EP: %s"],sepgp_minep)
         end
       end
     end
@@ -826,7 +1092,7 @@ function sepgp:shareSettings(force)
   local now = GetTime()
   if self._lastSettingsShare == nil or (now - self._lastSettingsShare > 30) or (force) then
     self._lastSettingsShare = now
-    local addonMsg = string.format("SETTINGS;%s:%s:%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay,tostring(sepgp_altspool),sepgp_altpercent)
+    local addonMsg = string.format("SETTINGS;%s:%s:%s:%s:%s:%s;1",sepgp_progress,sepgp_discount,sepgp_decay,sepgp_minep,tostring(sepgp_altspool),sepgp_altpercent)
     self:addonMessage(addonMsg,"GUILD")
   end
 end
@@ -1263,7 +1529,7 @@ function sepgp:buildClassMemberTable(roster,epgp)
     if (class) and (c[class] == nil) then
       c[class] = { }
       c[class].type = "group"
-      c[class].name = class
+      c[class].name = C:Colorize(BC:GetHexColor(class),class)
       c[class].desc = class .. " members"
       c[class].hidden = function() return not (admin()) end
       c[class].args = { }
@@ -1285,232 +1551,6 @@ function sepgp:buildClassMemberTable(roster,epgp)
     end
   end
   return c
-end
-
-local options
-function sepgp:buildMenu()
-  if not (options) then
-    options = {
-    type = "group",
-    desc = L["shootyepgp options"],
-    handler = self,
-    args = { }
-    }
-    options.args["ep"] = {
-      type = "group",
-      name = L["+EPs to Member"],
-      desc = L["Account EPs for member."],
-      order = 10,
-      hidden = function() return not (admin()) end,
-    }
-    options.args["ep_raid"] = {
-      type = "text",
-      name = L["+EPs to Raid"],
-      desc = L["Award EPs to all raid members."],
-      order = 20,
-      get = "suggestedAwardEP",
-      set = function(v) sepgp:award_raid_ep(tonumber(v)) end,
-      usage = "<EP>",
-      hidden = function() return not (admin()) end,
-      validate = function(v)
-        local n = tonumber(v)
-        return n and n >= 0 and n < sepgp.VARS.max
-      end
-    }
-    options.args["gp"] = {
-      type = "group",
-      name = L["+GPs to Member"],
-      desc = L["Account GPs for member."],
-      order = 30,
-      hidden = function() return not (admin()) end,
-    }
-    options.args["ep_reserves"] = {
-      type = "text",
-      name = L["+EPs to Reserves"],
-      desc = L["Award EPs to all active Reserves."],
-      order = 40,
-      get = "suggestedAwardEP",
-      set = function(v) sepgp:award_reserve_ep(tonumber(v)) end,
-      usage = "<EP>",
-      hidden = function() return not (admin()) end,
-      validate = function(v)
-        local n = tonumber(v)
-        return n and n >= 0 and n < sepgp.VARS.max
-      end    
-    }
-    options.args["reserves"] = {
-      type = "toggle",
-      name = L["Enable Reserves"],
-      desc = L["Participate in Standby Raiders List.\n|cffff0000Requires Main Character Name.|r"],
-      order = 50,
-      get = function() return (sepgp.reservesChannelID ~= nil) and (sepgp.reservesChannelID ~= 0) end,
-      set = function(v) sepgp:reservesToggle(v) end,
-      disabled = function() return (sepgp_main == nil) end
-    }
-    options.args["afkcheck_reserves"] = {
-      type = "execute",
-      name = L["AFK Check Reserves"],
-      desc = L["AFK Check Reserves List"],
-      order = 60,
-      hidden = function() return not (admin()) end,
-      func = function() sepgp:afkcheck_reserves() end
-    }
-    options.args["alts"] = {
-      type = "toggle",
-      name = L["Enable Alts"],
-      desc = L["Allow Alts to use Main\'s EPGP."],
-      order = 63,
-      hidden = function() return not (admin()) end,
-      disabled = function() return not (IsGuildLeader()) end,
-      get = function() return not not sepgp_altspool end,
-      set = function(v) 
-        sepgp_altspool = not sepgp_altspool
-        if (IsGuildLeader()) then
-          sepgp:shareSettings(true)
-        end
-      end,
-    }
-    options.args["alts_percent"] = {
-      type = "range",
-      name = L["Alts EP %"],
-      desc = L["Set the % EP Alts can earn."],
-      order = 66,
-      hidden = function() return (not sepgp_altspool) or (not IsGuildLeader()) end,
-      get = function() return sepgp_altpercent end,
-      set = function(v) 
-        sepgp_altpercent = v
-        if (IsGuildLeader()) then
-          sepgp:shareSettings(true)
-        end
-      end,
-      min = 0.5,
-      max = 1,
-      step = 0.05,
-      isPercent = true
-    }
-    options.args["set_main"] = {
-      type = "text",
-      name = L["Set Main"],
-      desc = L["Set your Main Character for Reserve List."],
-      order = 70,
-      usage = "<MainChar>",
-      get = function() return sepgp_main end,
-      set = function(v) sepgp_main = (sepgp:verifyGuildMember(v)) end,
-    }    
-    options.args["raid_only"] = {
-      type = "toggle",
-      name = L["Raid Only"],
-      desc = L["Only show members in raid."],
-      order = 80,
-      get = function() return not not sepgp_raidonly end,
-      set = function(v) 
-        sepgp_raidonly = not sepgp_raidonly
-        sepgp:SetRefresh(true)
-      end,
-    }
-    options.args["progress_tier_header"] = {
-      type = "header",
-      name = string.format(L["Progress Setting: %s"],sepgp_progress),
-      order = 85,
-      hidden = function() return admin() end,
-    }
-    options.args["progress_tier"] = {
-      type = "text",
-      name = L["Raid Progress"],
-      desc = L["Highest Tier the Guild is raiding.\nUsed to adjust GP Prices.\nUsed for suggested EP awards."],
-      order = 90,
-      hidden = function() return not (admin()) end,
-      get = function() return sepgp_progress end,
-      set = function(v) 
-        sepgp_progress = v 
-        sepgp:refreshPRTablets()
-        if (IsGuildLeader()) then
-          sepgp:shareSettings(true)
-        end
-      end,
-      validate = { ["T3"]=L["4.Naxxramas"], ["T2.5"]=L["3.Temple of Ahn\'Qiraj"], ["T2"]=L["2.Blackwing Lair"], ["T1"]=L["1.Molten Core"]},
-    }
-    options.args["report_channel"] = {
-      type = "text",
-      name = L["Reporting channel"],
-      desc = L["Channel used by reporting functions."],
-      order = 95,
-      hidden = function() return not (admin()) end,
-      get = function() return sepgp_saychannel end,
-      set = function(v) sepgp_saychannel = v end,
-      validate = { "PARTY", "RAID", "GUILD", "OFFICER" },
-    }    
-    options.args["decay"] = {
-      type = "execute",
-      name = L["Decay EPGP"],
-      desc = string.format(L["Decays all EPGP by %s%%"],(1-(sepgp_decay or sepgp.VARS.decay))*100),
-      order = 100,
-      hidden = function() return not (admin()) end,
-      func = function() sepgp:decay_epgp_v3() end 
-    }    
-    options.args["set_decay"] = {
-      type = "range",
-      name = L["Set Decay %"],
-      desc = L["Set Decay percentage (Admin only)."],
-      order = 110,
-      usage = "<Decay>",
-      get = function() return (1.0-sepgp_decay) end,
-      set = function(v) 
-        sepgp_decay = (1 - v)
-        options.args["decay"].desc = string.format(L["Decays all EPGP by %s%%"],(1-sepgp_decay)*100)
-        if (IsGuildLeader()) then
-          sepgp:shareSettings(true)
-        end
-      end,
-      min = 0.01,
-      max = 0.5,
-      step = 0.01,
-      bigStep = 0.05,
-      isPercent = true,
-      hidden = function() return not (admin()) end,    
-    }
-    options.args["set_discount_header"] = {
-      type = "header",
-      name = string.format(L["Offspec Price: %s%%"],sepgp_discount*100),
-      order = 111,
-      hidden = function() return admin() end,
-    }
-    options.args["set_discount"] = {
-      type = "range",
-      name = L["Offspec Price %"],
-      desc = L["Set Offspec Items GP Percent."],
-      order = 115,
-      hidden = function() return not (admin()) end,
-      get = function() return sepgp_discount end,
-      set = function(v) 
-        sepgp_discount = v
-        if (IsGuildLeader()) then
-          sepgp:shareSettings(true)
-        end
-      end,
-      min = 0,
-      max = 1,
-      step = 0.05,
-      isPercent = true
-    }
-    options.args["reset"] = {
-     type = "execute",
-     name = L["Reset EPGP"],
-     desc = string.format(L["Resets everyone\'s EPGP to 0/%d (Admin only)."],sepgp.VARS.basegp),
-     order = 120,
-     hidden = function() return not (IsGuildLeader()) end,
-     func = function() StaticPopup_Show("SHOOTY_EPGP_CONFIRM_RESET") end
-    }
-  end
-  if (needInit) or (needRefresh) then
-    local members = sepgp:buildRosterTable()
-    self:debugPrint(string.format(L["Scanning %d members for EP/GP data. (%s)"],table.getn(members),(sepgp_raidonly and "Raid" or "Full")))
-    options.args["ep"].args = sepgp:buildClassMemberTable(members,"ep")
-    options.args["gp"].args = sepgp:buildClassMemberTable(members,"gp")
-    if (needInit) then needInit = false end
-    if (needRefresh) then needRefresh = false end
-  end
-  return options
 end
 
 ---------------
@@ -1838,29 +1878,17 @@ function sepgp:captureLoot(message)
     end
   end
   if not (player and itemLink) then return end
-  local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")
-  if player and itemLink and link_found then 
-    local bind = self:itemBinding(itemString)
-    if not (bind) then return end
-    local price = sepgp_prices:GetPrice(itemString,sepgp_progress)
-    if (not (price)) or (price == 0) then
-      return
-    end
-    local class,_
-    if player == YOU then 
-      class = UnitClass("player") -- localized 
-    else
-      _, class = self:verifyGuildMember(player,true) -- localized
-    end
-    if not (class) then return end
-    local player_color = C:Colorize(BC:GetHexColor(class),player)
-    local off_price = math.floor(price*sepgp_discount)
-    local quality = hexColorQuality[itemColor] or -1
-    local timestamp = date("%b/%d %H:%M:%S")
-    local data = {[self.loot_index.time]=timestamp,[self.loot_index.player]=player,[self.loot_index.player_c]=player_color,[self.loot_index.item]=itemLink,[self.loot_index.bind]=bind,[self.loot_index.price]=price,[self.loot_index.off_price]=off_price}
-    local dialog = StaticPopup_Show("SHOOTY_EPGP_AUTO_GEARPOINTS",data[self.loot_index.player_c],data[self.loot_index.item],data)
-    if (dialog) then
-      dialog.data = data
+  self:processLoot(player,itemLink,"chat")
+end
+
+function sepgp:GiveMasterLoot(slot, index)
+  if LootSlotIsItem(slot) then
+    local texture, itemname, quantity, quality = GetLootSlotInfo(slot)
+    if quantity == 1 and quality >= 3 then -- not a stack and rare or higher
+      local itemLink = GetLootSlotLink(slot)
+      local player = GetMasterLootCandidate(index)
+      if not (player and itemLink) then return end
+      self:processLoot(player,itemLink,"masterloot")
     end
   end
 end
@@ -1993,6 +2021,51 @@ function sepgp:strsplit(delimiter, subject)
   local pattern = string.format("([^%s]+)", delimiter)
   string.gsub(subject, pattern, function(c) fields[table.getn(fields)+1] = c end)
   return unpack(fields)
+end
+
+function sepgp:processLootDupe(player,itemName,source)
+  local now = GetTime()
+  local player_name = player == YOU and self._playerName or player
+  local player_item = string.format("%s%s",player_name,itemName)
+  if ((self._lastPlayerItem) and self._lastPlayerItem == player_item)
+  and ((self._lastPlayerItemTime) and (now - self._lastPlayerItemTime) < 3)
+  and ((self._lastPlayerItemSource) and self._lastPlayerItemSource ~= source) then
+    return true, player_item, now
+  end
+  return false, player_item, now
+end
+
+function sepgp:processLoot(player,itemLink,source)
+  local link_found, _, itemColor, itemString, itemName = string.find(itemLink, "^(|c%x+)|H(.+)|h(%[.+%])")  
+  if link_found then
+    local dupe, player_item, now = self:processLootDupe(player,itemName,source)
+    if dupe then
+      return
+    end
+    local bind = self:itemBinding(itemString)
+    if not (bind) then return end
+    local price = sepgp_prices:GetPrice(itemString,sepgp_progress)
+    if (not (price)) or (price == 0) then
+      return
+    end
+    local class,_
+    if player == YOU or player == self._playerName then 
+      class = UnitClass("player") -- localized 
+    else
+      _, class = self:verifyGuildMember(player,true) -- localized
+    end
+    if not (class) then return end
+    self._lastPlayerItem, self._lastPlayerItemTime, self._lastPlayerItemSource = player_item, now, source
+    local player_color = C:Colorize(BC:GetHexColor(class),player)
+    local off_price = math.floor(price*sepgp_discount)
+    local quality = hexColorQuality[itemColor] or -1
+    local timestamp = date("%b/%d %H:%M:%S")
+    local data = {[self.loot_index.time]=timestamp,[self.loot_index.player]=player,[self.loot_index.player_c]=player_color,[self.loot_index.item]=itemLink,[self.loot_index.bind]=bind,[self.loot_index.price]=price,[self.loot_index.off_price]=off_price}
+    local dialog = StaticPopup_Show("SHOOTY_EPGP_AUTO_GEARPOINTS",data[self.loot_index.player_c],data[self.loot_index.item],data)
+    if (dialog) then
+      dialog.data = data
+    end
+  end
 end
 
 function sepgp:verifyGuildMember(name,silent)
@@ -2322,5 +2395,5 @@ function sepgp:EasyMenu_Initialize(level, menuList)
   end
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs
