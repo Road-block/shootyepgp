@@ -288,14 +288,13 @@ function sepgp_standings:setHideScript()
   while (tablet) and i<100 do
     if tablet.owner ~= nil and tablet.owner == "sepgp_standings" then
       sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
-      if not (tablet:GetScript("OnHide")) then
-        tablet:SetScript("OnHide",function()
-            if not T:IsAttached("sepgp_standings") then
-              T:Attach("sepgp_standings")
-              this:SetScript("OnHide",nil)
-            end
-          end)
-      end
+      tablet:SetScript("OnHide",nil)
+      tablet:SetScript("OnHide",function()
+          if not T:IsAttached("sepgp_standings") then
+            T:Attach("sepgp_standings")
+            this:SetScript("OnHide",nil)
+          end
+        end)
       break
     end    
     i = i+1
@@ -311,16 +310,18 @@ end
 
 function sepgp_standings:Toggle(forceShow)
   self:Top()
-  if T:IsAttached("sepgp_standings") then
+  if T:IsAttached("sepgp_standings") then -- hidden
     T:Detach("sepgp_standings") -- show
     if (T:IsLocked("sepgp_standings")) then
       T:ToggleLocked("sepgp_standings")
     end
     self:setHideScript()
-  elseif (forceShow) then
-    sepgp_standings:Refresh()
   else
-    T:Attach("sepgp_standings") -- hide
+    if (forceShow) then
+      sepgp_standings:Refresh()
+    else
+      T:Attach("sepgp_standings") -- hide
+    end
   end  
 end
 

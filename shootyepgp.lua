@@ -80,6 +80,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Clear Loot Table."],
       func = function()
         sepgp_looted = {}
+        sepgp_loot:Refresh()
         sepgp:defaultPrint(L["Loot info cleared"])
       end,
       order = 3,
@@ -90,6 +91,7 @@ local admincmd, membercmd = {type = "group", handler = sepgp, args = {
       desc = L["Clear Logs Table."],
       func = function()
         sepgp_log = {}
+        sepgp_logs:Refresh()
         sepgp:defaultPrint(L["Logs cleared"])
       end,
       order = 4,
@@ -494,7 +496,6 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   else
     self:RegisterEvent("AceEvent_FullyInitialized")
   end
-  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
 end
 
 function sepgp:OnDisable()
@@ -505,7 +506,6 @@ end
 function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER_LOGIN, PLAYER_ENTERING_WORLD (3)
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="AceEvent_FullyInitialized"})
   if self._hasInitFull then return end
-  self._options = self:buildMenu()
   
   for i=1,NUM_CHAT_WINDOWS do
     local tab = getglobal("ChatFrame"..i.."Tab")
@@ -517,9 +517,7 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
       shooty_debugchat:SetMaxLines(1024)
       break
     end
-  end 
-  
-  self:RegisterEvent("CHAT_MSG_ADDON","addonComms")
+  end
   
   if (sepgp_main == nil) or (sepgp_main == "") then
     if (IsInGuild()) then
@@ -658,6 +656,10 @@ function sepgp:delayedInit()
   if IsGuildLeader() and ( (sepgp_dbver == nil) or (major_ver > sepgp_dbver) ) then
     sepgp[string.format("v%dtov%d",(sepgp_dbver or 2),major_ver)](sepgp)
   end
+  -- init options and comms
+  self._options = self:buildMenu()
+  self:RegisterChatCommand({"/shooty","/sepgp","/shootyepgp"},self.cmdtable())
+  self:RegisterEvent("CHAT_MSG_ADDON","addonComms")  
   -- broadcast our version
   local addonMsg = string.format("VERSION;%s;%d",sepgp._versionString,major_ver)
   self:addonMessage(addonMsg,"GUILD")
@@ -1485,7 +1487,9 @@ function sepgp:buildRosterTable()
   if (sepgp_raidonly) and GetNumRaidMembers() > 0 then
     for i = 1, GetNumRaidMembers(true) do
       local name, rank, subgroup, level, class, fileName, zone, online, isDead = GetRaidRosterInfo(i) 
-      r[name] = true
+      if (name) then
+        r[name] = true
+      end
     end
   end
   sepgp.alts = {}
@@ -2049,8 +2053,9 @@ function sepgp:processLoot(player,itemLink,source)
       return
     end
     local class,_
-    if player == YOU or player == self._playerName then 
-      class = UnitClass("player") -- localized 
+    if player == YOU then player = self._playerName end
+    if player == self._playerName then 
+      class = UnitClass("player") -- localized
     else
       _, class = self:verifyGuildMember(player,true) -- localized
     end
@@ -2101,8 +2106,8 @@ end
 
 function sepgp:make_escable(framename,operation)
   local found
-  for i in UISpecialFrames do
-    if UISpecialFrames[i]==framename then
+  for i,f in ipairs(UISpecialFrames) do
+    if f==framename then
       found = i
     end
   end
@@ -2352,7 +2357,7 @@ StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
   button1 = L["GP Actions"],
   button2 = L["Remind me Later"],
   OnAccept = function()
-    sepgp:EasyMenu(sepgp_auto_gp_menu, sepgp._menuFrame, this, 0, 0, "MENU")
+    sepgp:EasyMenu(sepgp_auto_gp_menu, sepgp._menuFrame, this, 0, 0, "MENU", 1)
     return true
   end,
   OnCancel = function(data,reason)
@@ -2377,22 +2382,20 @@ StaticPopupDialogs["SHOOTY_EPGP_AUTO_GEARPOINTS"] = {
   whileDead = 1,
   hideOnEscape = 1
 }
-
-function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode)
+function sepgp:EasyMenu_Initialize(level, menuList)
+  for i, info in ipairs(menuList) do
+    if (info.text) then
+      info.index = i
+      UIDropDownMenu_AddButton( info, level )
+    end
+  end
+end
+function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode, level)
   if ( displayMode == "MENU" ) then
     menuFrame.displayMode = displayMode
   end
-  UIDropDownMenu_Initialize(menuFrame, function() sepgp:EasyMenu_Initialize(level, menuList) end, displayMode, nil, menuList)
-  ToggleDropDownMenu(1, nil, menuFrame, anchor, x, y, menuList)
-end
-function sepgp:EasyMenu_Initialize(level, menuList)
-  for index = 1, table.getn( menuList ) do
-    local value = menuList[index]
-    if (value.text) then
-      value.index = index;
-      UIDropDownMenu_AddButton( value, level );
-    end
-  end
+  UIDropDownMenu_Initialize(menuFrame, function() sepgp:EasyMenu_Initialize(level, menuList) end, displayMode, level)
+  ToggleDropDownMenu(1, nil, menuFrame, anchor, x, y)
 end
 
 -- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug

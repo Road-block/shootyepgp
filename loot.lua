@@ -50,14 +50,13 @@ function sepgp_loot:setHideScript()
   while (tablet) and i<100 do
     if tablet.owner ~= nil and tablet.owner == "sepgp_loot" then
       sepgp:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
-      if not (tablet:GetScript("OnHide")) then
-        tablet:SetScript("OnHide",function()
-            if not T:IsAttached("sepgp_loot") then
-              T:Attach("sepgp_loot")
-              this:SetScript("OnHide",nil)
-            end
-          end)
-      end
+      tablet:SetScript("OnHide",nil)
+      tablet:SetScript("OnHide",function()
+          if not T:IsAttached("sepgp_loot") then
+            T:Attach("sepgp_loot")
+            this:SetScript("OnHide",nil)
+          end
+        end)
       break
     end    
     i = i+1
@@ -79,10 +78,12 @@ function sepgp_loot:Toggle(forceShow)
       T:ToggleLocked("sepgp_loot")
     end
     self:setHideScript()
-  elseif (forceShow) then
-    sepgp_loot:Refresh()
   else
-    T:Attach("sepgp_loot") -- hide
+    if (forceShow) then
+      sepgp_loot:Refresh()
+    else
+      T:Attach("sepgp_loot") -- hide
+    end
   end  
 end
 
