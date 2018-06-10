@@ -211,6 +211,9 @@ local prices = {
   [23663] = {48,"T3"}; --Girdle of Elemental Fury
   [23664] = {48,"T3"}; --Pauldrons of Elemental Fury
   [23665] = {48,"T3"}; --Leggings of Elemental Fury
+  [23666] = {48,"T3"}; --Belt of the Grand Crusader
+  [23667] = {48,"T3"}; --Spaulders of the Grand Crusader
+  [23668] = {48,"T3"}; --Leggings of the Grand Crusader 
 
     ---------------------------
     --- Temple of Ahn'Qiraj ---
