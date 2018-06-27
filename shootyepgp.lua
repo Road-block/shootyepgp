@@ -552,10 +552,6 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   if pfUI ~= nil and pfUI.loot ~= nil and type(pfUI.loot.UpdateLootFrame) == "function" then
     self:SecureHook(pfUI.loot, "UpdateLootFrame", "pfUI_UpdateLootFrame")
   end
-  -- make tablets closable with ESC
-  for i=1,6 do
-    self:make_escable(string.format("Tablet20DetachedFrame%d",i),"add")
-  end
   self._hasInitFull = true
 end
 
