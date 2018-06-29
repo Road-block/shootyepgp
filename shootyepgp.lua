@@ -821,11 +821,11 @@ function sepgp:LootFrameItem_OnClick(button,data)
     local itemLink = GetLootSlotLink(slot)
     if (itemLink) then
       if button == "LeftButton" then
-        self:widestAudience(string.format(L["Whisper me + for %s (mainspec)"],itemLink))
+        self:widestAudience(string.format(L["Whisper %s a + for %s (mainspec)"],sepgp._playerName,itemLink))
       elseif button == "RightButton" then
-        self:widestAudience(string.format(L["Whisper me - for %s (offspec)"],itemLink))
+        self:widestAudience(string.format(L["Whisper %s a - for %s (offspec)"],sepgp._playerName,itemLink))
       elseif button == "MiddleButton" then
-        self:widestAudience(string.format(L["Whisper me + or - for %s (mainspec or offspec)"],itemLink))
+        self:widestAudience(string.format(L["Whisper %s a + or - for %s (mainspec or offspec)"],sepgp._playerName,itemLink))
       end
     end
   end
@@ -855,13 +855,13 @@ function sepgp:ContainerFrameItemButton_OnClick(button,ignoreModifiers)
       local bind = self:itemBinding(itemString) or ""
       if (bind == self.VARS.boe) then
         if button == "LeftButton" then
-          self:widestAudience(string.format(L["Whisper me + for %s (mainspec)"],itemLink))
+          self:widestAudience(string.format(L["Whisper %s a + for %s (mainspec)"],sepgp._playerName,itemLink))
           return
         elseif button == "RightButton" then
-          self:widestAudience(string.format(L["Whisper me - for %s (offspec)"],itemLink))
+          self:widestAudience(string.format(L["Whisper %s a - for %s (offspec)"],sepgp._playerName,itemLink))
           return
         elseif button == "MiddleButton" then
-          self:widestAudience(string.format(L["Whisper me + or - for %s (mainspec or offspec)"],itemLink))
+          self:widestAudience(string.format(L["Whisper %s a + or - for %s (mainspec or offspec)"],sepgp._playerName,itemLink))
           return
         end    
       end      
