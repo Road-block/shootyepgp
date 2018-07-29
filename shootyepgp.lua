@@ -536,7 +536,7 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
 
   -- if pfUI loaded, skin the extra tooltip
   if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
-    pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,pfUI_config.tooltip.alpha)
+    pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,tonumber(pfUI_config.tooltip.alpha))
   end
   -- hook GiveMasterLoot to catch loot assign to members too far for chat parsing
   self:SecureHook("GiveMasterLoot")
