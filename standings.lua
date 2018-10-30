@@ -348,9 +348,9 @@ local pr_sorter_standings = function(a,b)
     local b_over = b[4]-sepgp_minep >= 0
     if a_over and b_over or (not a_over and not b_over) then
       if a[6] ~= b[6] then
-        return a[6] > b[6]
+        return tonumber(a[6]) > tonumber(b[6])
       else
-        return a[4] > b[4]
+        return tonumber(a[4]) > tonumber(b[4])
       end
     elseif a_over and (not b_over) then
       return true
@@ -359,9 +359,9 @@ local pr_sorter_standings = function(a,b)
     end
   else
     if a[6] ~= b[6] then
-      return a[6] > b[6]
+      return tonumber(a[6]) > tonumber(b[6])
     else
-      return a[4] > b[4]
+      return tonumber(a[4]) > tonumber(b[4])
     end
   end
 end

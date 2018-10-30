@@ -535,8 +535,10 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
   end
 
   -- if pfUI loaded, skin the extra tooltip
-  if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
-    pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,tonumber(pfUI_config.tooltip.alpha))
+  if not IsAddOnLoaded("pfUI-addonskins") then
+    if (pfUI) and pfUI.api and pfUI.api.CreateBackdrop and pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha then
+      pfUI.api.CreateBackdrop(sepgp.extratip,nil,nil,tonumber(pfUI_config.tooltip.alpha))
+    end
   end
   -- hook GiveMasterLoot to catch loot assign to members too far for chat parsing
   self:SecureHook("GiveMasterLoot")
@@ -1771,8 +1773,8 @@ function sepgp:captureLootCall(text, sender)
 end
 
 local lootBid = {}
-lootBid.ms = {"(%+)",".+(%+).*",".*(%+).+",".*(%+).*","(ms)"}
-lootBid.os = {"(%-)",".+(%-).*",".*(%-).+",".*(%-).*","(os)"}
+lootBid.ms = {"(%+)",".+(%+).*",".*(%+).+",".*(%+).*","(ms)","(need)"}
+lootBid.os = {"(%-)",".+(%-).*",".*(%-).+",".*(%-).*","(os)","(greed)"}
 function sepgp:captureBid(text, sender)
   if not (running_bid) then return end
   if not (IsRaidLeader() or self:lootMaster()) then return end

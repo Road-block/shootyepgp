@@ -125,9 +125,9 @@ local pr_sorter_bids = function(a,b)
     local b_over = b[3]-sepgp_minep >= 0
     if a_over and b_over or (not a_over and not b_over) then
       if a[5] ~= b[5] then
-        return a[5] > b[5]
+        return tonumber(a[5]) > tonumber(b[5])
       else
-        return a[3] > b[3]
+        return tonumber(a[3]) > tonumber(b[3])
       end
     elseif a_over and (not b_over) then
       return true
@@ -136,9 +136,9 @@ local pr_sorter_bids = function(a,b)
     end
   else
     if a[5] ~= b[5] then
-      return a[5] > b[5]
+      return tonumber(a[5]) > tonumber(b[5])
     else
-      return a[3] > b[3]
+      return tonumber(a[3]) > tonumber(b[3])
     end
   end
 end
