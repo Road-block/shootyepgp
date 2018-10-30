@@ -15,6 +15,7 @@ sepgp.VARS = {
   decay = 0.9,
   max = 1000,
   timeout = 60,
+  minlevel = 55,
   maxloglines = 500,
   prefix = "SEPGP_PREFIX",
   reservechan = "Reserves",
@@ -451,11 +452,14 @@ function sepgp:OnInitialize() -- ADDON_LOADED (1) unless LoD
   if sepgp_log == nil then sepgp_log = {} end
   if sepgp_looted == nil then sepgp_looted = {} end
   if sepgp_debug == nil then sepgp_debug = {} end
+  self:RegisterDB("sepgp_fubar")
+  self:RegisterDefaults("char",{})
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnInitialize"})
 end
 
 function sepgp:OnEnable() -- PLAYER_LOGIN (2)
   --table.insert(sepgp_debug,{[date("%b/%d %H:%M:%S")]="OnEnable"})
+  sepgp._playerLevel = UnitLevel("player")
   sepgp.extratip = (sepgp.extratip) or CreateFrame("GameTooltip","shootyepgp_tooltip",UIParent,"GameTooltipTemplate")
   sepgp._versionString = GetAddOnMetadata("shootyepgp","Version")
   sepgp._websiteString = GetAddOnMetadata("shootyepgp","X-Website")
@@ -483,6 +487,19 @@ function sepgp:OnEnable() -- PLAYER_LOGIN (2)
       sepgp:SetRefresh(true)
       sepgp:testLootPrompt()
     end)
+  if sepgp._playerLevel and sepgp._playerLevel < MAX_PLAYER_LEVEL then
+    self:RegisterEvent("PLAYER_LEVEL_UP", function()
+        if (arg1) then
+          sepgp._playerLevel = tonumber(arg1)
+          if sepgp._playerLevel == MAX_PLAYER_LEVEL then
+            sepgp:UnregisterEvent("PLAYER_LEVEL_UP")
+          end
+          if sepgp._playerLevel and sepgp._playerLevel >= sepgp.VARS.minlevel then
+            sepgp:testMain()
+          end
+        end
+      end)
+  end
   self:RegisterEvent("CHAT_MSG_RAID","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_LEADER","captureLootCall")
   self:RegisterEvent("CHAT_MSG_RAID_WARNING","captureLootCall")
@@ -518,12 +535,8 @@ function sepgp:AceEvent_FullyInitialized() -- SYNTHETIC EVENT, later than PLAYER
       break
     end
   end
-  
-  if (sepgp_main == nil) or (sepgp_main == "") then
-    if (IsInGuild()) then
-      StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
-    end
-  end
+
+  self:testMain()
 
   local delay = 2
   if self:IsEventRegistered("AceEvent_FullyInitialized") then
@@ -1250,7 +1263,9 @@ function sepgp:award_raid_ep(ep) -- awards ep to raid members in zone
   if GetNumRaidMembers()>0 then
     for i = 1, GetNumRaidMembers(true) do
       local name, rank, subgroup, level, class, fileName, zone, online, isDead = GetRaidRosterInfo(i)
-      self:givename_ep(name,ep)
+      if level >= sepgp.VARS.minlevel then
+        self:givename_ep(name,ep)
+      end
     end
     self:simpleSay(string.format(L["Giving %d ep to all raidmembers"],ep))
     self:addToLog(string.format(L["Giving %d ep to all raidmembers"],ep))    
@@ -1440,10 +1455,13 @@ end
 ---------
 -- Menu
 ---------
+sepgp.hasIcon = "Interface\\PetitionFrame\\GuildCharter-Icon"
+sepgp.title = "shootyepgp"
 sepgp.defaultMinimapPosition = 180
+sepgp.defaultPosition = "RIGHT"
 sepgp.cannotDetachTooltip = true
 sepgp.tooltipHiddenWhenEmpty = false
-sepgp.hasIcon = "Interface\\PetitionFrame\\GuildCharter-Icon"
+sepgp.independentProfile = true
 
 function sepgp:OnTooltipUpdate()
   local hint = L["|cffffff00Click|r to toggle Standings.%s \n|cffffff00Right-Click|r for Options."]
@@ -1492,8 +1510,9 @@ function sepgp:buildRosterTable()
   end
   sepgp.alts = {}
   for i = 1, numGuildMembers do
-    local member_name,_,_,_,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
+    local member_name,_,_,level,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
     local main, main_class, main_rank = self:parseAlt(member_name,officernote)
+    local is_raid_level = tonumber(level) and level >= sepgp.VARS.minlevel
     if (main) then
       if ((self._playerName) and (name == self._playerName)) then
         if (not sepgp_main) or (sepgp_main and sepgp_main ~= main) then
@@ -1506,11 +1525,13 @@ function sepgp:buildRosterTable()
       sepgp.alts[main][member_name] = class
     end
     if (sepgp_raidonly) and next(r) then
-      if r[member_name] then
+      if r[member_name] and is_raid_level then
         table.insert(g,{["name"]=member_name,["class"]=class})
       end
     else
-      table.insert(g,{["name"]=member_name,["class"]=class})
+      if is_raid_level then
+        table.insert(g,{["name"]=member_name,["class"]=class})
+      end
     end    
   end
   return g
@@ -2074,7 +2095,8 @@ end
 function sepgp:verifyGuildMember(name,silent)
   for i=1,GetNumGuildMembers(1) do
     local g_name, g_rank, g_rankIndex, g_level, g_class, g_zone, g_note, g_officernote, g_online = GetGuildRosterInfo(i)
-    if (string.lower(name) == string.lower(g_name)) and (tonumber(g_level) == MAX_PLAYER_LEVEL) then
+    if (string.lower(name) == string.lower(g_name)) and (tonumber(g_level) >= sepgp.VARS.minlevel) then 
+    -- == MAX_PLAYER_LEVEL]]
       return g_name, g_class, g_rank, g_officernote
     end
   end
@@ -2099,6 +2121,14 @@ function sepgp:lootMaster()
     return true
   else
     return false
+  end
+end
+
+function sepgp:testMain()
+  if (sepgp_main == nil) or (sepgp_main == "") then
+    if (IsInGuild()) then
+      StaticPopup_Show("SHOOTY_EPGP_SET_MAIN")
+    end
   end
 end
 
@@ -2396,5 +2426,5 @@ function sepgp:EasyMenu(menuList, menuFrame, anchor, x, y, displayMode, level)
   ToggleDropDownMenu(1, nil, menuFrame, anchor, x, y)
 end
 
--- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug
+-- GLOBALS: sepgp_saychannel,sepgp_groupbyclass,sepgp_groupbyarmor,sepgp_groupbyrole,sepgp_raidonly,sepgp_decay,sepgp_minep,sepgp_reservechannel,sepgp_main,sepgp_progress,sepgp_discount,sepgp_altspool,sepgp_altpercent,sepgp_log,sepgp_dbver,sepgp_looted,sepgp_debug,sepgp_fubar
 -- GLOBALS: sepgp,sepgp_prices,sepgp_standings,sepgp_bids,sepgp_loot,sepgp_reserves,sepgp_alts,sepgp_logs

@@ -6,14 +6,15 @@ shootyepgp requires some modifications to guild permissions for officer notes by
 
 ### Version 3.x (current)
 - officer notes must be set to visible by all and editable **only** by the EPGP admins (eg. officer rank+)
-- public notes are free to be used for anything
+- public notes are not in use by the addon
 
-### _Version 2.x (deprecated)_ 
+#### _Version 2.x (deprecated)_ 
 - _public and officer notes must be set to visible by all._
 - _both public and officer notes **must** be editable **only** by the EPGP admins (eg. officer rank+)_
 
 ## tips
-Creating a new chatframe (right-click > create new window on chat tab) and naming it `debug` (capitalization doesn't matter) will move the bulk of information messages there and out of your default chatframe.
+Create a new chatframe (right-click > create new window on chat tab) and name it `debug` (capitalization doesn't matter)  
+Most of the information messages will now print on that frame and not clutter your default chatframe.
 
 ## usage
 Right-click on minimap or FuBar shootyepgp icon will show all available settings.  
@@ -27,8 +28,8 @@ The standings window can also be toggled with **/shooty show** chat command.
 - Item GP prices on item tooltips (all)
 - Export standings to csv (all)
 - Configurable EPGP Decay (admin)
-- Configurable Offspec discount (all)
-- Guild Progression multiplier (all)
+- Configurable Offspec discount (admin)
+- Guild Progression multiplier (admin)
 - Reserves - *standby list EP* - with alts support (admin and all)
 
 Addon has been designed so that basic member functionality is usable even without the addon. 
