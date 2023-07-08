@@ -1511,28 +1511,30 @@ function sepgp:buildRosterTable()
   sepgp.alts = {}
   for i = 1, numGuildMembers do
     local member_name,_,_,level,class,_,note,officernote,_,_ = GetGuildRosterInfo(i)
-    local main, main_class, main_rank = self:parseAlt(member_name,officernote)
-    local is_raid_level = tonumber(level) and level >= sepgp.VARS.minlevel
-    if (main) then
-      if ((self._playerName) and (name == self._playerName)) then
-        if (not sepgp_main) or (sepgp_main and sepgp_main ~= main) then
-          sepgp_main = main
-          self:defaultPrint(L["Your main has been set to %s"],sepgp_main)
+    if member_name and member_name ~= "" then
+      local main, main_class, main_rank = self:parseAlt(member_name,officernote)
+      local is_raid_level = tonumber(level) and level >= sepgp.VARS.minlevel
+      if (main) then
+        if ((self._playerName) and (name == self._playerName)) then
+          if (not sepgp_main) or (sepgp_main and sepgp_main ~= main) then
+            sepgp_main = main
+            self:defaultPrint(L["Your main has been set to %s"],sepgp_main)
+          end
+        end
+        main = C:Colorize(BC:GetHexColor(main_class), main)
+        sepgp.alts[main] = sepgp.alts[main] or {}
+        sepgp.alts[main][member_name] = class
+      end
+      if (sepgp_raidonly) and next(r) then
+        if r[member_name] and is_raid_level then
+          table.insert(g,{["name"]=member_name,["class"]=class})
+        end
+      else
+        if is_raid_level then
+          table.insert(g,{["name"]=member_name,["class"]=class})
         end
       end
-      main = C:Colorize(BC:GetHexColor(main_class), main)
-      sepgp.alts[main] = sepgp.alts[main] or {}
-      sepgp.alts[main][member_name] = class
     end
-    if (sepgp_raidonly) and next(r) then
-      if r[member_name] and is_raid_level then
-        table.insert(g,{["name"]=member_name,["class"]=class})
-      end
-    else
-      if is_raid_level then
-        table.insert(g,{["name"]=member_name,["class"]=class})
-      end
-    end    
   end
   return g
 end
